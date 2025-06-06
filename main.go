@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -13,11 +14,13 @@ import (
 )
 
 type Rule struct {
-	ID          int
-	Description string
-	Validator   func(string) bool
-	IsSatisfied bool
-	Hint        string
+	ID             int
+	Description    string
+	Validator      func(string) bool
+	IsSatisfied    bool
+	Hint           string
+	NewlyRevealed  bool
+	NewlySatisfied bool // Track when rule becomes satisfied for the first time
 }
 
 type PageData struct {
@@ -238,9 +241,17 @@ func NewRuleSet() *RuleSet {
 	}
 }
 
-func (rs *RuleSet) ValidatePassword(password string) {
+func (rs *RuleSet) ValidatePassword(password string, previousStates []bool) {
 	for i := range rs.Rules {
+		oldSatisfied := false
+		if i < len(previousStates) {
+			oldSatisfied = previousStates[i]
+		}
+
 		rs.Rules[i].IsSatisfied = rs.Rules[i].Validator(password)
+
+		// Mark as newly satisfied if it wasn't satisfied before but is now
+		rs.Rules[i].NewlySatisfied = !oldSatisfied && rs.Rules[i].IsSatisfied
 	}
 }
 
@@ -252,6 +263,14 @@ func (rs *RuleSet) GetSatisfiedCount() int {
 		}
 	}
 	return count
+}
+
+func (rs *RuleSet) GetSatisfiedStates() []bool {
+	states := make([]bool, len(rs.Rules))
+	for i, rule := range rs.Rules {
+		states[i] = rule.IsSatisfied
+	}
+	return states
 }
 
 const htmlTemplate = `
@@ -267,59 +286,98 @@ const htmlTemplate = `
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔐 Password Game</h1>
+            <h1>🔐 The Password Game*</h1>
         </div>
         
         <div class="input-section">
-            <input type="text" 
-                   class="password-input" 
-                   placeholder="Start typing your password..."
-                   hx-post="/validate"
-                   hx-target="#rules-container"
-                   hx-trigger="keyup changed delay:300ms"
-                   hx-include="this"
-                   name="password"
-                   autocomplete="off"
-                   value="{{.Password}}">
-                   
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: {{.ProgressPercentage}}%"></div>
+            <div class="input-wrapper">
+                <input type="text" 
+                       class="password-input" 
+                       placeholder="insert here..."
+                       hx-post="/validate"
+                       hx-target="#rules-container"
+                       hx-trigger="input"
+                       hx-include="this"
+                       name="password"
+                       autocomplete="off"
+                       value="{{.Password}}"
+                       id="password-input"
+                       hx-headers='{"X-Prev-Max-Visible": "1"}'>
+                <div class="char-count" id="char-count">0</div>
             </div>
-
         </div>
         
-            
-            <div id="rules-container" class="rules-container">
-                {{if .HasPassword}}
-                    {{range $index, $rule := .Rules}}
-                        {{if or (lt $index $.MaxVisibleRule) ($rule.IsSatisfied)}}
-                        <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}">
-                            <div class="rule-number">{{.ID}}</div>
-                            <div class="rule-content">
-                                <div class="rule-text">{{.Description}}</div>
-                                {{if not .IsSatisfied}}
-                                <div class="rule-hint">{{.Hint}}</div>
-                                {{end}}
-                            </div>
-                            <div class="checkmark">✓</div>
+        <div id="rules-container" class="rules-container">
+            {{if .HasPassword}}
+                {{range $index, $rule := .Rules}}
+                    {{if or (lt $index $.MaxVisibleRule) ($rule.IsSatisfied)}}
+                    <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}">
+                        <div class="rule-number">{{.ID}}</div>
+                        <div class="rule-content">
+                            <div class="rule-text">{{.Description}}</div>
+                            {{if not .IsSatisfied}}
+                            <div class="rule-hint">{{.Hint}}</div>
+                            {{end}}
                         </div>
-                        {{end}}
+                        <div class="checkmark">✓</div>
+                    </div>
                     {{end}}
-                {{else}}
-                <div style="text-align: center; color: #666; font-style: italic; padding: 20px;">
-                    Enter Password
-                </div>
                 {{end}}
+            {{else}}
+            <div style="text-align: center; color: #666; font-style: italic; padding: 20px;">
+                Start typing to see the rules appear...
             </div>
+            {{end}}
         </div>
     </div>
+
+    <script>
+        // Track max visible rule and previous states for animations
+        let currentMaxVisible = 1;
+        let satisfiedStates = {};
+        
+        // Update character count on input
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInput = document.querySelector('.password-input');
+            const charCount = document.getElementById('char-count');
+            
+            function updateCharCount() {
+                charCount.textContent = passwordInput.value.length;
+            }
+            
+            // Update on page load
+            updateCharCount();
+            
+            // Update on input
+            passwordInput.addEventListener('input', updateCharCount);
+            
+            // Update headers before HTMX request
+            passwordInput.addEventListener('htmx:configRequest', function(evt) {
+                evt.detail.headers['X-Prev-Max-Visible'] = currentMaxVisible.toString();
+                evt.detail.headers['X-Satisfied-States'] = JSON.stringify(satisfiedStates);
+            });
+            
+            // Update current max visible and satisfied states after response
+            passwordInput.addEventListener('htmx:afterRequest', function(evt) {
+                const newMaxVisible = evt.detail.xhr.getResponseHeader('X-Max-Visible');
+                if (newMaxVisible) {
+                    currentMaxVisible = parseInt(newMaxVisible);
+                }
+                
+                const newSatisfiedStates = evt.detail.xhr.getResponseHeader('X-Satisfied-States');
+                if (newSatisfiedStates) {
+                    satisfiedStates = JSON.parse(newSatisfiedStates);
+                }
+            });
+        });
+    </script>
 </body>
 </html>`
 
 const rulesPartialTemplate = `{{if .HasPassword}}
     {{range $index, $rule := .Rules}}
         {{if or (lt $index $.MaxVisibleRule) ($rule.IsSatisfied)}}
-        <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}">
+        <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}">
             <div class="rule-number">{{.ID}}</div>
             <div class="rule-content">
                 <div class="rule-text">{{.Description}}</div>
@@ -345,6 +403,7 @@ type TemplateData struct {
 	AllSatisfied       bool
 	MaxVisibleRule     int
 	HasPassword        bool
+	PrevMaxVisible     int
 }
 
 func getMaxVisibleRule(rules []Rule) int {
@@ -396,14 +455,43 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	password := r.FormValue("password")
+	prevMaxVisible := 1
+
+	// Try to get previous max visible from header (sent by HTMX)
+	if prev := r.Header.Get("X-Prev-Max-Visible"); prev != "" {
+		if val, err := strconv.Atoi(prev); err == nil {
+			prevMaxVisible = val
+		}
+	}
+
+	// Get previous satisfied states
+	var previousStates []bool
+	if states := r.Header.Get("X-Satisfied-States"); states != "" {
+		// Parse the JSON map and convert to slice
+		stateMap := make(map[string]bool)
+		if err := json.Unmarshal([]byte(states), &stateMap); err == nil {
+			previousStates = make([]bool, 20) // Assuming 20 rules
+			for i := 0; i < 20; i++ {
+				previousStates[i] = stateMap[strconv.Itoa(i)]
+			}
+		}
+	}
+
 	ruleSet := NewRuleSet()
-	ruleSet.ValidatePassword(password)
+	ruleSet.ValidatePassword(password, previousStates)
 
 	satisfiedCount := ruleSet.GetSatisfiedCount()
 	rulesLen := len(ruleSet.Rules)
 	progressPercentage := (float64(satisfiedCount) / float64(rulesLen)) * 100
 	allSatisfied := satisfiedCount == rulesLen
 	maxVisible := getMaxVisibleRule(ruleSet.Rules)
+
+	// Mark newly revealed rules
+	for i := range ruleSet.Rules {
+		if i+1 > prevMaxVisible && i+1 <= maxVisible && !ruleSet.Rules[i].IsSatisfied {
+			ruleSet.Rules[i].NewlyRevealed = true
+		}
+	}
 
 	data := TemplateData{
 		Password:           password,
@@ -413,9 +501,22 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		AllSatisfied:       allSatisfied,
 		HasPassword:        len(password) > 0,
 		MaxVisibleRule:     maxVisible,
+		PrevMaxVisible:     prevMaxVisible,
 	}
 
-	// Return just the rules partial for HTMX l
+	// Send the new max visible and satisfied states back to client
+	w.Header().Set("X-Max-Visible", strconv.Itoa(maxVisible))
+
+	// Convert satisfied states to map for JSON
+	stateMap := make(map[string]bool)
+	for i, rule := range ruleSet.Rules {
+		stateMap[strconv.Itoa(i)] = rule.IsSatisfied
+	}
+	if statesJSON, err := json.Marshal(stateMap); err == nil {
+		w.Header().Set("X-Satisfied-States", string(statesJSON))
+	}
+
+	// Return just the rules partial for HTMX
 	tmpl := template.Must(template.New("rules").Parse(rulesPartialTemplate))
 	tmpl.Execute(w, data)
 }

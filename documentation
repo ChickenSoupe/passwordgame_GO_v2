@@ -1,0 +1,65 @@
+NewRuleSet: Creates a new RuleSet instance with a predefined set of rules.
+
+ValidatePassword: Validates a password against the rules in the RuleSet and updates the satisfaction status of each rule.
+
+GetSatisfiedCount: Returns the number of satisfied rules.
+
+GetSatisfiedStates: Returns a slice of boolean values representing the satisfaction status of each rule.
+
+handleHome: Handles GET requests to the root URL ("/") and serves the main HTML page.
+
+handleValidate: Handles POST requests to the "/validate" URL, validates the password, and returns an updated rules partial for HTMX.
+
+getMaxVisibleRule: Calculates the maximum visible rule based on the satisfaction status of each rule.
+
+
++---------------+
+|  NewRuleSet  |
++---------------+
+         |
+         |
+         v
++---------------+
+|  ValidatePassword  |
+|  (updates rule  |
+|   satisfaction)    |
++---------------+
+         |
+         |
+         v
++---------------+
+|  GetSatisfiedCount  |
+|  (returns satisfied  |
+|   rule count)        |
++---------------+
+         |
+         |
+         v
++---------------+
+|  GetSatisfiedStates  |
+|  (returns satisfied  |
+|   rule states)       |
++---------------+
+         |
+         |
+         v
++---------------+
+|  handleHome        |
+|  (serves main HTML)  |
++---------------+
+         |
+         |
+         v
++---------------+
+|  handleValidate    |
+|  (validates password  |
+|   and updates rules)  |
++---------------+
+         |
+         |
+         v
++---------------+
+|  getMaxVisibleRule  |
+|  (calculates max     |
+|   visible rule)      |
++---------------+

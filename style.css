@@ -1,217 +1,285 @@
 * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-        
-        .input-section {
-            padding: 30px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .password-input {
-            width: 100%;
-            padding: 15px 20px;
-            border: 3px solid #ddd;
-            border-radius: 15px;
-            font-size: 18px;
-            font-family: 'Courier New', monospace;
-            background: white;
-            transition: border-color 0.3s ease;
-        }
-        
-        .password-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .progress-bar {
-            margin-top: 20px;
-            background: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            height: 8px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ff6b6b, #ffa500, #32cd32);
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
-        
-        .progress-text {
-            text-align: center;
-            margin-top: 10px;
-            font-weight: 600;
-            color: #666;
-        }
-        
-        .rules-section {
-            padding: 20px 30px 30px;
-        }
-        
-        .rule-item {
-            display: flex;
-            align-items: flex-start;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 12px;
-            border-left: 4px solid #e74c3c;
-            background: #fdf2f2;
-            transition: all 0.3s ease;
-            position: relative;
-            opacity: 0;
-            transform: translateY(-10px);
-            animation: slideInRule 0.3s ease forwards;
-        }
-        
-        .rule-item.satisfied {
-            border-left-color: #27ae60;
-            background: #f2fdf2;
-            order: 2;
-        }
-        
-        .rule-item:not(.satisfied) {
-            order: 1;
-        }
-        
-        .rule-item.hidden {
-            display: none;
-        }
-        
-        @keyframes slideInRule {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .rule-number {
-            background: #e74c3c;
-            color: white;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            margin-right: 15px;
-            flex-shrink: 0;
-            transition: background-color 0.3s ease;
-        }
-        
-        .rule-item.satisfied .rule-number {
-            background: #27ae60;
-        }
-        
-        .rule-content {
-            flex: 1;
-        }
-        
-        .rule-text {
-            font-size: 16px;
-            color: #333;
-            line-height: 1.4;
-            margin-bottom: 5px;
-        }
-        
-        .rule-item.satisfied .rule-text {
-            color: #666;
-        }
-        
-        .rule-hint {
-            font-size: 13px;
-            color: #888;
-            font-style: italic;
-        }
-        
-        .rule-item.satisfied .rule-hint {
-            display: none;
-        }
-        
-        .checkmark {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 20px;
-            color: #27ae60;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .rule-item.satisfied .checkmark {
-            opacity: 1;
-        }
-        
-        .completion-message {
-            background: linear-gradient(135deg, #00c851, #007e33);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 15px;
-            margin: 20px 0;
-            font-size: 18px;
-            font-weight: 600;
-            display: none;
-        }
-        
-        .completion-message.show {
-            display: block;
-            animation: slideIn 0.5s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .rules-container {
-            display: flex;
-            flex-direction: column;
-        }
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5e6d3;
+    min-height: 100vh;
+    padding: 40px 20px;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.header {
+    background: transparent;
+    color: #333;
+    padding: 0 0 30px 0;
+    text-align: center;
+}
+
+.header h1 {
+    font-size: 2.8em;
+    margin-bottom: 10px;
+    font-weight: 700;
+    color: #333;
+}
+
+.input-section {
+    padding: 0 0 30px 0;
+    background: transparent;
+    border-bottom: none;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.password-input {
+    flex: 1;
+    padding: 15px 20px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.char-count {
+    background: #f0f0f0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    min-width: 60px;
+    text-align: center;
+    border: 1px solid #ddd;
+}
+
+.password-input:focus {
+    outline: none;
+    border-color: #999;
+    box-shadow: none;
+}
+
+.progress-bar {
+    display: none;
+}
+
+.progress-fill {
+    display: none;
+}
+
+.progress-text {
+    display: none;
+}
+
+.rules-section {
+    padding: 0;
+}
+
+.rules-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: relative;
+}
+
+.rule-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 20px;
+    margin: 0;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background: #fff;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 1;
+    transform-origin: top;
+}
+
+.rule-item:not(.satisfied) {
+    background: #ffebee;
+    border-color: #f44336;
+    order: 1;
+}
+
+.rule-item.satisfied {
+    background: #e8f5e8;
+    border-color: #4caf50;
+    order: 2;
+    transform: translateY(0);
+    z-index: 1;
+    /* Removed the slideToBottom animation that was causing continuous sliding */
+}
+
+/* Only animate when a rule is newly satisfied */
+.rule-item.newly-satisfied {
+    animation: slideToBottom 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.rule-item.newly-revealed {
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: slideInFromTop 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
+}
+
+.rule-item.hidden {
+    display: none;
+}
+
+@keyframes slideToBottom {
+    0% {
+        transform: translateY(0);
+        z-index: 2;
+    }
+    50% {
+        transform: translateY(10px);
+        z-index: 2;
+    }
+    100% {
+        transform: translateY(0);
+        z-index: 1;
+    }
+}
+
+@keyframes slideInFromTop {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRule {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.rule-number {
+    background: #f44336;
+    color: white;
+    border-radius: 4px;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 15px;
+    flex-shrink: 0;
+    transition: background-color 0.3s ease;
+    padding: 4px 8px;
+    min-width: 45px;
+}
+
+.rule-item.satisfied .rule-number {
+    background: #4caf50;
+}
+
+.rule-number::before {
+    content: 'Rule ';
+}
+
+.rule-content {
+    flex: 1;
+}
+
+.rule-text {
+    font-size: 16px;
+    color: #333;
+    line-height: 1.4;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.rule-item.satisfied .rule-text {
+    color: #333;
+}
+
+.rule-hint {
+    display: none;
+}
+
+.rule-item.satisfied .rule-hint {
+    display: none;
+}
+
+.checkmark {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+    color: #4caf50;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-weight: bold;
+}
+
+.rule-item.satisfied .checkmark {
+    opacity: 1;
+}
+
+.rule-item:not(.satisfied) .checkmark::before {
+    content: '✗';
+    color: #f44336;
+    opacity: 1;
+}
+
+.completion-message {
+    background: linear-gradient(135deg, #00c851, #007e33);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    border-radius: 15px;
+    margin: 20px 0;
+    font-size: 18px;
+    font-weight: 600;
+    display: none;
+}
+
+.completion-message.show {
+    display: block;
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Override the default placeholder styling */
+.password-input::placeholder {
+    color: #999;
+    font-style: italic;
+}
