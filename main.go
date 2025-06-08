@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -273,6 +274,30 @@ func (rs *RuleSet) GetSatisfiedStates() []bool {
 	return states
 }
 
+// Sort rules: unsatisfied rules first (highest ID to lowest), then satisfied rules (highest ID to lowest)
+func (rs *RuleSet) GetSortedVisibleRules(maxVisible int) []Rule {
+	var visibleRules []Rule
+
+	// Collect visible rules (either satisfied or within maxVisible range)
+	for i, rule := range rs.Rules {
+		if rule.IsSatisfied || i < maxVisible {
+			visibleRules = append(visibleRules, rule)
+		}
+	}
+
+	// Sort: unsatisfied rules first (reverse ID order), then satisfied rules (reverse ID order)
+	sort.Slice(visibleRules, func(i, j int) bool {
+		// If both have same satisfaction status, sort by ID descending
+		if visibleRules[i].IsSatisfied == visibleRules[j].IsSatisfied {
+			return visibleRules[i].ID > visibleRules[j].ID
+		}
+		// Unsatisfied rules come first
+		return !visibleRules[i].IsSatisfied && visibleRules[j].IsSatisfied
+	})
+
+	return visibleRules
+}
+
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -309,19 +334,17 @@ const htmlTemplate = `
         
         <div id="rules-container" class="rules-container">
             {{if .HasPassword}}
-                {{range $index, $rule := .Rules}}
-                    {{if or (lt $index $.MaxVisibleRule) ($rule.IsSatisfied)}}
-                    <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}">
-                        <div class="rule-number">{{.ID}}</div>
-                        <div class="rule-content">
-                            <div class="rule-text">{{.Description}}</div>
-                            {{if not .IsSatisfied}}
-                            <div class="rule-hint">{{.Hint}}</div>
-                            {{end}}
-                        </div>
-                        <div class="checkmark">✓</div>
+                {{range .SortedRules}}
+                <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}">
+                    <div class="rule-number">{{.ID}}</div>
+                    <div class="rule-content">
+                        <div class="rule-text">{{.Description}}</div>
+                        {{if not .IsSatisfied}}
+                        <div class="rule-hint">{{.Hint}}</div>
+                        {{end}}
                     </div>
-                    {{end}}
+                    <div class="checkmark">✓</div>
+                </div>
                 {{end}}
             {{else}}
             <div style="text-align: center; color: #666; font-style: italic; padding: 20px;">
@@ -375,19 +398,17 @@ const htmlTemplate = `
 </html>`
 
 const rulesPartialTemplate = `{{if .HasPassword}}
-    {{range $index, $rule := .Rules}}
-        {{if or (lt $index $.MaxVisibleRule) ($rule.IsSatisfied)}}
-        <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}">
-            <div class="rule-number">{{.ID}}</div>
-            <div class="rule-content">
-                <div class="rule-text">{{.Description}}</div>
-                {{if not .IsSatisfied}}
-                <div class="rule-hint">{{.Hint}}</div>
-                {{end}}
-            </div>
-            <div class="checkmark">✓</div>
+    {{range .SortedRules}}
+    <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}">
+        <div class="rule-number">{{.ID}}</div>
+        <div class="rule-content">
+            <div class="rule-text">{{.Description}}</div>
+            {{if not .IsSatisfied}}
+            <div class="rule-hint">{{.Hint}}</div>
+            {{end}}
         </div>
-        {{end}}
+        <div class="checkmark">✓</div>
+    </div>
     {{end}}
 {{else}}
 <div style="text-align: center; color: #666; font-style: italic; padding: 20px;">
@@ -398,6 +419,7 @@ const rulesPartialTemplate = `{{if .HasPassword}}
 type TemplateData struct {
 	Password           string
 	Rules              []Rule
+	SortedRules        []Rule
 	SatisfiedCount     int
 	ProgressPercentage float64
 	AllSatisfied       bool
@@ -437,6 +459,7 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 	data := TemplateData{
 		Password:           "",
 		Rules:              ruleSet.Rules,
+		SortedRules:        []Rule{}, // Empty for initial load
 		SatisfiedCount:     satisfiedCount,
 		ProgressPercentage: 0,
 		AllSatisfied:       false,
@@ -486,16 +509,25 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	allSatisfied := satisfiedCount == rulesLen
 	maxVisible := getMaxVisibleRule(ruleSet.Rules)
 
+	// Get sorted visible rules
+	sortedRules := ruleSet.GetSortedVisibleRules(maxVisible)
+
 	// Mark newly revealed rules
-	for i := range ruleSet.Rules {
-		if i+1 > prevMaxVisible && i+1 <= maxVisible && !ruleSet.Rules[i].IsSatisfied {
-			ruleSet.Rules[i].NewlyRevealed = true
+	for i := range sortedRules {
+		ruleIndex := sortedRules[i].ID - 1 // Convert to 0-based index
+		if sortedRules[i].ID > prevMaxVisible && sortedRules[i].ID <= maxVisible && !sortedRules[i].IsSatisfied {
+			sortedRules[i].NewlyRevealed = true
+		}
+		// Update newly satisfied from original rules
+		if ruleIndex < len(ruleSet.Rules) {
+			sortedRules[i].NewlySatisfied = ruleSet.Rules[ruleIndex].NewlySatisfied
 		}
 	}
 
 	data := TemplateData{
 		Password:           password,
 		Rules:              ruleSet.Rules,
+		SortedRules:        sortedRules,
 		SatisfiedCount:     satisfiedCount,
 		ProgressPercentage: progressPercentage,
 		AllSatisfied:       allSatisfied,

@@ -106,7 +106,7 @@ body {
     border-radius: 12px;
     border: 2px solid transparent;
     background: #fff;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.5s ease-in-out;
     position: relative;
     opacity: 1;
     transform: translateY(0);
@@ -118,40 +118,37 @@ body {
 .rule-item:not(.satisfied) {
     background: #ffebee;
     border-color: #f44336;
-    order: 1;
 }
 
 .rule-item.satisfied {
     background: #e8f5e8;
     border-color: #4caf50;
-    order: 2;
     transform: translateY(0);
     z-index: 1;
-    /* Removed the slideToBottom animation that was causing continuous sliding */
 }
 
 /* Only animate when a rule is newly satisfied */
 .rule-item.newly-satisfied {
-    animation: slideToBottom 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: slideToTop 0.6s ease-in-out forwards;
 }
 
 .rule-item.newly-revealed {
     opacity: 0;
     transform: translateY(-20px);
-    animation: slideInFromTop 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
+    animation: slideInFromTop 0.6s ease-in-out 0.3s forwards;
 }
 
 .rule-item.hidden {
     display: none;
 }
 
-@keyframes slideToBottom {
+@keyframes slideToTop {
     0% {
         transform: translateY(0);
         z-index: 2;
     }
     50% {
-        transform: translateY(10px);
+        transform: translateY(-10px);
         z-index: 2;
     }
     100% {
