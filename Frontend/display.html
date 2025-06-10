@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Ultimate Password Game</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 The Password Game*</h1>
+        </div>
+        
+        <div class="input-section">
+            <div class="input-wrapper">
+                <input type="text" 
+                       class="password-input" 
+                       placeholder="insert here..."
+                       hx-post="/validate"
+                       hx-target="#rules-container"
+                       hx-trigger="input"
+                       hx-include="this"
+                       name="password"
+                       autocomplete="off"
+                       value="{{.Password}}"
+                       id="password-input">
+                <div class="char-count" id="char-count">0</div>
+            </div>
+        </div>
+        
+        <div id="rules-container" class="rules-container">
+            {{range .SortedRules}}
+            <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}" data-rule-id="{{.ID}}">
+                <div class="rule-number">{{.ID}}</div>
+                <div class="rule-content">
+                    <div class="rule-text">{{.Description}}</div>
+                    {{if not .IsSatisfied}}
+                    <div class="rule-hint">{{.Hint}}</div>
+                    {{end}}
+                </div>
+                <div class="checkmark">✓</div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <script>
+        // Track satisfied and visible states for animations
+        let satisfiedStates = {};
+        let visibleStates = {};
+        let previousRuleOrder = [];
+        let isAnimating = false;
+        let pendingUpdate = null;
+        
+        // Update character count on input
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInput = document.querySelector('.password-input');
+            const charCount = document.getElementById('char-count');
+            const rulesContainer = document.getElementById('rules-container');
+            
+            function updateCharCount() {
+                charCount.textContent = passwordInput.value.length;
+            }
+            
+            // Update on page load
+            updateCharCount();
+            
+            // Update on input with animation check
+            passwordInput.addEventListener('input', function() {
+                updateCharCount();
+                
+                // If animations are playing, store the pending update
+                if (isAnimating) {
+                    pendingUpdate = passwordInput.value;
+                    return;
+                }
+                
+                // Process the update immediately if no animations
+                processPendingUpdate();
+            });
+            
+            function processPendingUpdate() {
+                if (pendingUpdate !== null) {
+                    // Trigger HTMX manually for the pending update
+                    htmx.trigger(passwordInput, 'htmx:trigger');
+                    pendingUpdate = null;
+                }
+            }
+            
+            // Update headers before HTMX request
+            passwordInput.addEventListener('htmx:configRequest', function(evt) {
+                evt.detail.headers['X-Satisfied-States'] = JSON.stringify(satisfiedStates);
+                evt.detail.headers['X-Visible-States'] = JSON.stringify(visibleStates);
+            });
+            
+            // Handle animations after HTMX response
+            passwordInput.addEventListener('htmx:afterRequest', function(evt) {
+                const newSatisfiedStates = evt.detail.xhr.getResponseHeader('X-Satisfied-States');
+                if (newSatisfiedStates) {
+                    satisfiedStates = JSON.parse(newSatisfiedStates);
+                }
+                
+                const newVisibleStates = evt.detail.xhr.getResponseHeader('X-Visible-States');
+                if (newVisibleStates) {
+                    visibleStates = JSON.parse(newVisibleStates);
+                }
+                
+                // Handle rule repositioning animations
+                handleRuleRepositioning();
+            });
+            
+            function handleRuleRepositioning() {
+                const currentRules = Array.from(document.querySelectorAll('.rule-item'));
+                const currentOrder = currentRules.map(rule => parseInt(rule.dataset.ruleId));
+                
+                // If order changed and we have previous order, animate repositioning
+                if (previousRuleOrder.length > 0 && JSON.stringify(previousRuleOrder) !== JSON.stringify(currentOrder)) {
+                    isAnimating = true;
+                    
+                    // Store original positions
+                    const originalPositions = new Map();
+                    currentRules.forEach((rule, index) => {
+                        const rect = rule.getBoundingClientRect();
+                        originalPositions.set(parseInt(rule.dataset.ruleId), {
+                            top: rect.top,
+                            element: rule,
+                            originalIndex: previousRuleOrder.indexOf(parseInt(rule.dataset.ruleId))
+                        });
+                    });
+                    
+                    // Apply sliding animation to moved rules
+                    currentRules.forEach((rule, newIndex) => {
+                        const ruleId = parseInt(rule.dataset.ruleId);
+                        const oldIndex = previousRuleOrder.indexOf(ruleId);
+                        
+                        if (oldIndex !== -1 && oldIndex !== newIndex) {
+                            // Calculate movement distance
+                            const oldPos = originalPositions.get(ruleId);
+                            const newRect = rule.getBoundingClientRect();
+                            const deltaY = oldPos.top - newRect.top;
+                            
+                            // Apply initial transform (starting position)
+                            rule.style.transform = 'translateY(${deltaY}px)';
+                            rule.style.transition = 'none';
+                            
+                            // Force reflow
+                            rule.offsetHeight;
+                            
+                            // Animate to final position
+                            rule.style.transition = 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                            rule.style.transform = 'translateY(0)';
+                            
+                            // Add visual feedback
+                            rule.classList.add('sliding');
+                            
+                            // Clean up after animation
+                            setTimeout(() => {
+                                rule.style.transform = '';
+                                rule.style.transition = '';
+                                rule.classList.remove('sliding');
+                                
+                                // Check if this was the last rule to animate
+                                if (!document.querySelector('.sliding')) {
+                                    isAnimating = false;
+                                    processPendingUpdate();
+                                }
+                            }, 800);
+                        }
+                    });
+                    
+                    // If no rules actually moved, reset animation state
+                    if (!document.querySelector('.sliding')) {
+                        isAnimating = false;
+                        processPendingUpdate();
+                    }
+                } else {
+                    // No repositioning needed, process any pending updates
+                    processPendingUpdate();
+                }
+                
+                previousRuleOrder = [...currentOrder];
+            }
+            
+            // Monitor for CSS animations and update isAnimating state
+            rulesContainer.addEventListener('animationstart', function(e) {
+                if (e.animationName === 'fadeInRule' || e.animationName === 'simpleFadeColor') {
+                    isAnimating = true;
+                }
+            });
+            
+            rulesContainer.addEventListener('animationend', function(e) {
+                if (e.animationName === 'fadeInRule' || e.animationName === 'simpleFadeColor') {
+                    // Check if any other animations are still running
+                    setTimeout(() => {
+                        const activeAnimations = rulesContainer.querySelectorAll('.newly-revealed, .newly-satisfied');
+                        if (activeAnimations.length === 0) {
+                            isAnimating = false;
+                            processPendingUpdate();
+                        }
+                    }, 50);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
