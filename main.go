@@ -7,13 +7,21 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ChickenSoupe/passwordgame_GO_v2/rules/basic" // Import the basic rules package
-	// Adjust import path as needed
+	"passgame/rules/basic" // Basic rules package
 )
 
 type PageData struct {
 	Password string
 	Rules    []basic.Rule
+}
+
+// RuleChangeAnalysis tracks what changed between validations
+type RuleChangeAnalysis struct {
+	HasChanges       bool
+	NewlySatisfied   []int
+	NewlyUnsatisfied []int
+	NewlyVisible     []int
+	NewlyHidden      []int
 }
 
 const rulesPartialTemplate = `{{range .SortedRules}}
@@ -37,6 +45,52 @@ type TemplateData struct {
 	ProgressPercentage float64
 	AllSatisfied       bool
 	HasPassword        bool
+	RuleChanges        RuleChangeAnalysis
+}
+
+func analyzeRuleChanges(currentRules []basic.Rule, previousSatisfied, previousVisible []bool) RuleChangeAnalysis {
+	analysis := RuleChangeAnalysis{
+		NewlySatisfied:   make([]int, 0),
+		NewlyUnsatisfied: make([]int, 0),
+		NewlyVisible:     make([]int, 0),
+		NewlyHidden:      make([]int, 0),
+	}
+
+	for i, rule := range currentRules {
+		// Check satisfaction changes
+		if i < len(previousSatisfied) {
+			wasStatisfied := previousSatisfied[i]
+			isStatisfied := rule.IsSatisfied
+
+			if !wasStatisfied && isStatisfied {
+				analysis.NewlySatisfied = append(analysis.NewlySatisfied, rule.ID)
+				analysis.HasChanges = true
+			} else if wasStatisfied && !isStatisfied {
+				analysis.NewlyUnsatisfied = append(analysis.NewlyUnsatisfied, rule.ID)
+				analysis.HasChanges = true
+			}
+		}
+
+		// Check visibility changes
+		if i < len(previousVisible) {
+			wasVisible := previousVisible[i]
+			isVisible := rule.IsVisible
+
+			if !wasVisible && isVisible {
+				analysis.NewlyVisible = append(analysis.NewlyVisible, rule.ID)
+				analysis.HasChanges = true
+			} else if wasVisible && !isVisible {
+				analysis.NewlyHidden = append(analysis.NewlyHidden, rule.ID)
+				analysis.HasChanges = true
+			}
+		} else if rule.IsVisible {
+			// New rule that's visible
+			analysis.NewlyVisible = append(analysis.NewlyVisible, rule.ID)
+			analysis.HasChanges = true
+		}
+	}
+
+	return analysis
 }
 
 func handleHome(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +163,9 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	ruleSet := basic.NewRuleSet()
 	basic.ValidatePassword(ruleSet, password, previousSatisfiedStates, previousVisibleStates)
 
+	// Analyze what changed
+	ruleChanges := analyzeRuleChanges(ruleSet.Rules, previousSatisfiedStates, previousVisibleStates)
+
 	satisfiedCount := basic.GetSatisfiedCount(ruleSet)
 	rulesLen := len(ruleSet.Rules)
 	progressPercentage := (float64(satisfiedCount) / float64(rulesLen)) * 100
@@ -125,6 +182,7 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		ProgressPercentage: progressPercentage,
 		AllSatisfied:       allSatisfied,
 		HasPassword:        len(password) > 0,
+		RuleChanges:        ruleChanges,
 	}
 
 	// Send the satisfied and visible states back to client

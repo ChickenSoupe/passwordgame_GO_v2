@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Ultimate Password Game</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
@@ -29,9 +29,7 @@
                 <div class="char-count" id="char-count">0</div>
             </div>
         </div>
-        
         <div id="rules-container" class="rules-container">
-            <!-- Rule 1 initially hidden -->
             <div class="rule-item initially-hidden" data-rule-id="1">
                 <div class="rule-number">1</div>
                 <div class="rule-content">
@@ -41,19 +39,202 @@
                 <div class="checkmark">✓</div>
             </div>
         </div>
+
     </div>
 
     <script>
-        // FLIP Animation System
-        class FLIPAnimator {
+        // Animation Queue Manager - Prevents ALL interruptions
+        class AnimationQueueManager {
             constructor() {
                 this.isAnimating = false;
-                this.pendingUpdate = null;
+                this.pendingUpdates = [];
+                this.animationDuration = 500; // ms
+                this.latestInputValue = null; // Track latest input value
+            }
+
+            // Queue an update to be processed when animations finish
+            queueUpdate(updateFunction) {
+                if (this.isAnimating) {
+                    // Replace any pending updates with this latest one
+                    this.pendingUpdates = [updateFunction];
+                    console.log('Animation in progress - queuing update');
+                } else {
+                    // Execute immediately if not animating
+                    updateFunction();
+                }
+            }
+
+            // Process the queue if not currently animating
+            processQueue() {
+                if (this.isAnimating || this.pendingUpdates.length === 0) {
+                    return;
+                }
+
+                console.log('Processing queued updates');
+                // Execute all pending updates
+                while (this.pendingUpdates.length > 0) {
+                    const update = this.pendingUpdates.shift();
+                    update();
+                }
+            }
+
+            // Mark animation as started
+            startAnimation() {
+                this.isAnimating = true;
+                console.log('Animation started - blocking all DOM updates');
+                
+                // Auto-clear after animation duration + buffer
+                setTimeout(() => {
+                    this.finishAnimation();
+                }, this.animationDuration + 100);
+            }
+
+            // Mark animation as finished and process queue
+            finishAnimation() {
+                this.isAnimating = false;
+                console.log('Animation finished - processing queued updates');
+                
+                // Process any queued updates
+                requestAnimationFrame(() => {
+                    this.processQueue();
+                });
+            }
+
+            // Force finish (emergency cleanup)
+            forceFinish() {
+                this.isAnimating = false;
+                this.pendingUpdates = [];
+                
+                // Clean up any existing animations
+                const animatingRules = document.querySelectorAll('.flip-animate');
+                animatingRules.forEach(rule => {
+                    rule.style.transform = '';
+                    rule.style.transition = '';
+                    rule.classList.remove('flip-animate');
+                });
+            }
+
+            // Check if currently animating
+            isCurrentlyAnimating() {
+                return this.isAnimating;
+            }
+        }
+
+        // Enhanced Smart Debouncer with queue integration
+        class SmartDebouncer {
+            constructor(delay = 300, animationQueue) {
+                this.delay = delay;
+                this.timeoutId = null;
+                this.callback = null;
+                this.pendingValue = null;
+                this.animationQueue = animationQueue;
+            }
+
+            debounce(callback, value) {
+                this.callback = callback;
+                this.pendingValue = value;
+
+                // Clear existing timeout
+                if (this.timeoutId) {
+                    clearTimeout(this.timeoutId);
+                }
+
+                // Start debounce timer
+                this.timeoutId = setTimeout(() => {
+                    this.execute();
+                }, this.delay);
+            }
+
+            execute() {
+                if (this.callback && this.pendingValue !== null) {
+                    const callback = this.callback;
+                    const value = this.pendingValue;
+                    
+                    // Queue the update through animation manager
+                    this.animationQueue.queueUpdate(() => {
+                        callback(value);
+                    });
+                    
+                    this.pendingValue = null;
+                }
+            }
+
+            cancel() {
+                if (this.timeoutId) {
+                    clearTimeout(this.timeoutId);
+                    this.timeoutId = null;
+                }
+            }
+        }
+
+        // Rule State Manager
+        class RuleStateManager {
+            constructor() {
+                this.previousStates = {
+                    satisfied: {},
+                    visible: {}
+                };
+                this.currentStates = {
+                    satisfied: {},
+                    visible: {}
+                };
+            }
+
+            updateStates(satisfiedStates, visibleStates) {
+                this.previousStates = {
+                    satisfied: { ...this.currentStates.satisfied },
+                    visible: { ...this.currentStates.visible }
+                };
+
+                this.currentStates = {
+                    satisfied: { ...satisfiedStates },
+                    visible: { ...visibleStates }
+                };
+            }
+
+            hasRuleStateChanges() {
+                const satisfactionChanged = this.hasStateChanged(
+                    this.previousStates.satisfied,
+                    this.currentStates.satisfied
+                );
+
+                const visibilityChanged = this.hasStateChanged(
+                    this.previousStates.visible,
+                    this.currentStates.visible
+                );
+
+                return satisfactionChanged || visibilityChanged;
+            }
+
+            hasStateChanged(previous, current) {
+                const prevKeys = Object.keys(previous);
+                const currKeys = Object.keys(current);
+
+                if (prevKeys.length !== currKeys.length) {
+                    return true;
+                }
+
+                for (const key of currKeys) {
+                    if (previous[key] !== current[key]) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        // Enhanced FLIP Animator with queue integration
+        class FLIPAnimator {
+            constructor(ruleStateManager, animationQueue) {
                 this.firstStates = new Map();
+                this.ruleStateManager = ruleStateManager;
+                this.animationQueue = animationQueue;
+                this.animationDuration = 500; // ms
             }
 
             recordFirst() {
-                const rules = document.querySelectorAll('.rule-item');
+                const rules = document.querySelectorAll('.rule-item:not(.initially-hidden)');
                 this.firstStates.clear();
                 
                 rules.forEach(rule => {
@@ -67,34 +248,42 @@
                 });
             }
 
-            animateToLast() {
-                if (this.firstStates.size === 0) return;
+            shouldAnimate() {
+                return this.ruleStateManager.hasRuleStateChanges();
+            }
 
-                const rules = document.querySelectorAll('.rule-item');
+            animateToLast() {
+                if (!this.shouldAnimate()) {
+                    console.log('No rule state changes - skipping animation');
+                    return;
+                }
+
+                if (this.firstStates.size === 0) {
+                    console.log('No first states recorded - skipping animation');
+                    return;
+                }
+
+                const rules = document.querySelectorAll('.rule-item:not(.initially-hidden)');
                 const animatingRules = [];
 
                 rules.forEach(rule => {
                     const ruleId = rule.dataset.ruleId;
                     const first = this.firstStates.get(ruleId);
                     
-                    if (!first) return; // New rule, no animation needed
+                    if (!first) return;
 
                     const last = rule.getBoundingClientRect();
                     const deltaX = first.left - last.left;
                     const deltaY = first.top - last.top;
 
-                    // Only animate if there's significant movement
                     if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-                        // Apply initial transform (First position)
                         rule.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
                         rule.style.transition = 'none';
                         
-                        // Force reflow
-                        rule.offsetHeight;
+                        rule.offsetHeight; // Force reflow
                         
-                        // Add animation class and animate to Last position
                         rule.classList.add('flip-animate');
-                        rule.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                        rule.style.transition = `transform ${this.animationDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
                         rule.style.transform = 'translate(0, 0)';
                         
                         animatingRules.push(rule);
@@ -102,106 +291,152 @@
                 });
 
                 if (animatingRules.length > 0) {
-                    this.isAnimating = true;
+                    this.animationQueue.startAnimation();
+                    console.log(`Animating ${animatingRules.length} rules`);
                     
-                    // Clean up after animation completes
                     const cleanup = () => {
                         animatingRules.forEach(rule => {
                             rule.style.transform = '';
                             rule.style.transition = '';
                             rule.classList.remove('flip-animate');
                         });
-                        this.isAnimating = false;
-                        this.processPendingUpdate();
+                        this.animationQueue.finishAnimation();
+                        console.log('Animation cleanup completed');
                     };
 
-                    // Use timeout as fallback and listen for transition end
-                    setTimeout(cleanup, 500);
+                    // Primary cleanup mechanism
+                    setTimeout(cleanup, this.animationDuration);
                     
-                    animatingRules[0].addEventListener('transitionend', cleanup, { once: true });
+                    // Backup cleanup
+                    if (animatingRules[0]) {
+                        animatingRules[0].addEventListener('transitionend', cleanup, { once: true });
+                    }
                 } else {
-                    this.processPendingUpdate();
+                    console.log('No visual movement - no animation needed');
                 }
-            }
-
-            processPendingUpdate() {
-                if (this.pendingUpdate !== null) {
-                    htmx.trigger(document.getElementById('password-input'), 'htmx:trigger');
-                    this.pendingUpdate = null;
-                }
-            }
-
-            setPendingUpdate(value) {
-                this.pendingUpdate = value;
             }
         }
 
-        // Initialize FLIP animator
-        const flipAnimator = new FLIPAnimator();
+        // Initialize components with proper dependencies
+        const animationQueue = new AnimationQueueManager();
+        const smartDebouncer = new SmartDebouncer(250, animationQueue);
+        const ruleStateManager = new RuleStateManager();
+        const flipAnimator = new FLIPAnimator(ruleStateManager, animationQueue);
 
-        // Track state
-        let satisfiedStates = {};
-        let visibleStates = {};
         let hasUserInput = false;
 
         document.addEventListener('DOMContentLoaded', function() {
             const passwordInput = document.querySelector('.password-input');
             const charCount = document.getElementById('char-count');
-            const rulesContainer = document.getElementById('rules-container');
             
             function updateCharCount() {
-                charCount.textContent = passwordInput.value.length;
+                // Only update if not animating to prevent visual interruption
+                if (!animationQueue.isCurrentlyAnimating()) {
+                    charCount.textContent = passwordInput.value.length;
+                }
             }
             
-            // Update on page load
-            updateCharCount();
-            
-            // Handle input with FLIP animation
-            passwordInput.addEventListener('input', function() {
-                updateCharCount();
-                
-                // Show rule 1 on first input
-                if (!hasUserInput && this.value.length > 0) {
-                    hasUserInput = true;
-                    const rule1 = document.querySelector('[data-rule-id="1"]');
-                    if (rule1) {
-                        rule1.classList.remove('initially-hidden');
-                    }
-                }
-                
-                // If animations are playing, store the pending update
-                if (flipAnimator.isAnimating) {
-                    flipAnimator.setPendingUpdate(this.value);
+            function processPasswordUpdate(value) {
+                // Only proceed if not currently animating
+                if (animationQueue.isCurrentlyAnimating()) {
+                    console.log('Animation in progress - deferring password update');
+                    // Re-queue this update for later
+                    animationQueue.queueUpdate(() => processPasswordUpdate(value));
                     return;
                 }
                 
-                // Record FIRST state before HTMX update
+                // Record first state before making changes
                 flipAnimator.recordFirst();
+                
+                // Update input and trigger HTMX
+                passwordInput.value = value;
+                htmx.trigger(passwordInput, 'htmx:trigger');
+            }
+            
+            updateCharCount();
+            
+            passwordInput.addEventListener('input', function() {
+                const currentValue = this.value;
+                
+                // Queue ALL updates through animation manager to prevent interruption
+                animationQueue.queueUpdate(() => {
+                    // Update character count
+                    updateCharCount();
+                    
+                    // Show rule 1 on first input
+                    if (!hasUserInput && currentValue.length > 0) {
+                        hasUserInput = true;
+                        const rule1 = document.querySelector('[data-rule-id="1"]');
+                        if (rule1) {
+                            rule1.classList.remove('initially-hidden');
+                        }
+                    }
+                    
+                    // Process password update with debouncing
+                    smartDebouncer.debounce(processPasswordUpdate, currentValue);
+                });
             });
             
-            // Update headers before HTMX request
             passwordInput.addEventListener('htmx:configRequest', function(evt) {
-                evt.detail.headers['X-Satisfied-States'] = JSON.stringify(satisfiedStates);
-                evt.detail.headers['X-Visible-States'] = JSON.stringify(visibleStates);
+                const currentSatisfied = ruleStateManager.currentStates.satisfied;
+                const currentVisible = ruleStateManager.currentStates.visible;
+                
+                evt.detail.headers['X-Satisfied-States'] = JSON.stringify(currentSatisfied);
+                evt.detail.headers['X-Visible-States'] = JSON.stringify(currentVisible);
             });
             
-            // Handle FLIP animation after HTMX response
             passwordInput.addEventListener('htmx:afterRequest', function(evt) {
                 const newSatisfiedStates = evt.detail.xhr.getResponseHeader('X-Satisfied-States');
+                const newVisibleStates = evt.detail.xhr.getResponseHeader('X-Visible-States');
+                
+                let satisfiedStates = {};
+                let visibleStates = {};
+                
                 if (newSatisfiedStates) {
                     satisfiedStates = JSON.parse(newSatisfiedStates);
                 }
                 
-                const newVisibleStates = evt.detail.xhr.getResponseHeader('X-Visible-States');
                 if (newVisibleStates) {
                     visibleStates = JSON.parse(newVisibleStates);
                 }
                 
-                // Trigger FLIP animation (LAST and INVERT + PLAY)
+                ruleStateManager.updateStates(satisfiedStates, visibleStates);
+                
+                // Queue animation (will only run if not currently animating)
                 requestAnimationFrame(() => {
                     flipAnimator.animateToLast();
                 });
             });
+
+            // Cleanup on page visibility changes
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    animationQueue.forceFinish();
+                    smartDebouncer.cancel();
+                }
+            });
+
+            // Emergency cleanup
+            window.addEventListener('beforeunload', function() {
+                animationQueue.forceFinish();
+                smartDebouncer.cancel();
+            });
+
+            // Initialize rule states
+            const initialRules = document.querySelectorAll('.rule-item');
+            const initialSatisfied = {};
+            const initialVisible = {};
+            
+            initialRules.forEach(rule => {
+                const ruleId = rule.dataset.ruleId;
+                if (ruleId) {
+                    initialSatisfied[ruleId] = rule.classList.contains('satisfied');
+                    initialVisible[ruleId] = !rule.classList.contains('initially-hidden');
+                }
+            });
+            
+            ruleStateManager.updateStates(initialSatisfied, initialVisible);
+            console.log('Initial rule states:', { satisfied: initialSatisfied, visible: initialVisible });
         });
     </script>
 </body>

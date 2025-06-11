@@ -323,7 +323,7 @@ func GetSortedVisibleRules(rs *RuleSet) []Rule {
 		for j := i + 1; j < len(visibleRules); j++ {
 			// If both have same satisfaction status, sort by ID ascending (lowest to highest)
 			if visibleRules[i].IsSatisfied == visibleRules[j].IsSatisfied {
-				if visibleRules[i].ID > visibleRules[j].ID {
+				if visibleRules[i].ID < visibleRules[j].ID {
 					visibleRules[i], visibleRules[j] = visibleRules[j], visibleRules[i]
 				}
 			} else {

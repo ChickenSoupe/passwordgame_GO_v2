@@ -1,3 +1,3 @@
-module github.com/ChickenSoupe/passwordgame_GO_v2
+module passgame
 
 go 1.24.3
