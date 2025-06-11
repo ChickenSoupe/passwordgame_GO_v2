@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Ultimate Password Game</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <link rel="stylesheet" href="/style.css">
+     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
@@ -24,37 +24,126 @@
                        hx-include="this"
                        name="password"
                        autocomplete="off"
-                       value="{{.Password}}"
+                       value=""
                        id="password-input">
                 <div class="char-count" id="char-count">0</div>
             </div>
         </div>
         
         <div id="rules-container" class="rules-container">
-            {{range .SortedRules}}
-            <div class="rule-item {{if .IsSatisfied}}satisfied{{end}}" data-rule-id="{{.ID}}">
-                <div class="rule-number">{{.ID}}</div>
+            <!-- Rule 1 initially hidden -->
+            <div class="rule-item initially-hidden" data-rule-id="1">
+                <div class="rule-number">1</div>
                 <div class="rule-content">
-                    <div class="rule-text">{{.Description}}</div>
-                    {{if not .IsSatisfied}}
-                    <div class="rule-hint">{{.Hint}}</div>
-                    {{end}}
+                    <div class="rule-text">Your password must be at least 5 characters</div>
+                    <div class="rule-hint">Try adding more characters</div>
                 </div>
                 <div class="checkmark">✓</div>
             </div>
-            {{end}}
         </div>
     </div>
 
     <script>
-        // Track satisfied and visible states for animations
+        // FLIP Animation System
+        class FLIPAnimator {
+            constructor() {
+                this.isAnimating = false;
+                this.pendingUpdate = null;
+                this.firstStates = new Map();
+            }
+
+            recordFirst() {
+                const rules = document.querySelectorAll('.rule-item');
+                this.firstStates.clear();
+                
+                rules.forEach(rule => {
+                    const rect = rule.getBoundingClientRect();
+                    this.firstStates.set(rule.dataset.ruleId, {
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height
+                    });
+                });
+            }
+
+            animateToLast() {
+                if (this.firstStates.size === 0) return;
+
+                const rules = document.querySelectorAll('.rule-item');
+                const animatingRules = [];
+
+                rules.forEach(rule => {
+                    const ruleId = rule.dataset.ruleId;
+                    const first = this.firstStates.get(ruleId);
+                    
+                    if (!first) return; // New rule, no animation needed
+
+                    const last = rule.getBoundingClientRect();
+                    const deltaX = first.left - last.left;
+                    const deltaY = first.top - last.top;
+
+                    // Only animate if there's significant movement
+                    if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+                        // Apply initial transform (First position)
+                        rule.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                        rule.style.transition = 'none';
+                        
+                        // Force reflow
+                        rule.offsetHeight;
+                        
+                        // Add animation class and animate to Last position
+                        rule.classList.add('flip-animate');
+                        rule.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                        rule.style.transform = 'translate(0, 0)';
+                        
+                        animatingRules.push(rule);
+                    }
+                });
+
+                if (animatingRules.length > 0) {
+                    this.isAnimating = true;
+                    
+                    // Clean up after animation completes
+                    const cleanup = () => {
+                        animatingRules.forEach(rule => {
+                            rule.style.transform = '';
+                            rule.style.transition = '';
+                            rule.classList.remove('flip-animate');
+                        });
+                        this.isAnimating = false;
+                        this.processPendingUpdate();
+                    };
+
+                    // Use timeout as fallback and listen for transition end
+                    setTimeout(cleanup, 500);
+                    
+                    animatingRules[0].addEventListener('transitionend', cleanup, { once: true });
+                } else {
+                    this.processPendingUpdate();
+                }
+            }
+
+            processPendingUpdate() {
+                if (this.pendingUpdate !== null) {
+                    htmx.trigger(document.getElementById('password-input'), 'htmx:trigger');
+                    this.pendingUpdate = null;
+                }
+            }
+
+            setPendingUpdate(value) {
+                this.pendingUpdate = value;
+            }
+        }
+
+        // Initialize FLIP animator
+        const flipAnimator = new FLIPAnimator();
+
+        // Track state
         let satisfiedStates = {};
         let visibleStates = {};
-        let previousRuleOrder = [];
-        let isAnimating = false;
-        let pendingUpdate = null;
-        
-        // Update character count on input
+        let hasUserInput = false;
+
         document.addEventListener('DOMContentLoaded', function() {
             const passwordInput = document.querySelector('.password-input');
             const charCount = document.getElementById('char-count');
@@ -67,27 +156,28 @@
             // Update on page load
             updateCharCount();
             
-            // Update on input with animation check
+            // Handle input with FLIP animation
             passwordInput.addEventListener('input', function() {
                 updateCharCount();
                 
+                // Show rule 1 on first input
+                if (!hasUserInput && this.value.length > 0) {
+                    hasUserInput = true;
+                    const rule1 = document.querySelector('[data-rule-id="1"]');
+                    if (rule1) {
+                        rule1.classList.remove('initially-hidden');
+                    }
+                }
+                
                 // If animations are playing, store the pending update
-                if (isAnimating) {
-                    pendingUpdate = passwordInput.value;
+                if (flipAnimator.isAnimating) {
+                    flipAnimator.setPendingUpdate(this.value);
                     return;
                 }
                 
-                // Process the update immediately if no animations
-                processPendingUpdate();
+                // Record FIRST state before HTMX update
+                flipAnimator.recordFirst();
             });
-            
-            function processPendingUpdate() {
-                if (pendingUpdate !== null) {
-                    // Trigger HTMX manually for the pending update
-                    htmx.trigger(passwordInput, 'htmx:trigger');
-                    pendingUpdate = null;
-                }
-            }
             
             // Update headers before HTMX request
             passwordInput.addEventListener('htmx:configRequest', function(evt) {
@@ -95,7 +185,7 @@
                 evt.detail.headers['X-Visible-States'] = JSON.stringify(visibleStates);
             });
             
-            // Handle animations after HTMX response
+            // Handle FLIP animation after HTMX response
             passwordInput.addEventListener('htmx:afterRequest', function(evt) {
                 const newSatisfiedStates = evt.detail.xhr.getResponseHeader('X-Satisfied-States');
                 if (newSatisfiedStates) {
@@ -107,100 +197,10 @@
                     visibleStates = JSON.parse(newVisibleStates);
                 }
                 
-                // Handle rule repositioning animations
-                handleRuleRepositioning();
-            });
-            
-            function handleRuleRepositioning() {
-                const currentRules = Array.from(document.querySelectorAll('.rule-item'));
-                const currentOrder = currentRules.map(rule => parseInt(rule.dataset.ruleId));
-                
-                // If order changed and we have previous order, animate repositioning
-                if (previousRuleOrder.length > 0 && JSON.stringify(previousRuleOrder) !== JSON.stringify(currentOrder)) {
-                    isAnimating = true;
-                    
-                    // Store original positions
-                    const originalPositions = new Map();
-                    currentRules.forEach((rule, index) => {
-                        const rect = rule.getBoundingClientRect();
-                        originalPositions.set(parseInt(rule.dataset.ruleId), {
-                            top: rect.top,
-                            element: rule,
-                            originalIndex: previousRuleOrder.indexOf(parseInt(rule.dataset.ruleId))
-                        });
-                    });
-                    
-                    // Apply sliding animation to moved rules
-                    currentRules.forEach((rule, newIndex) => {
-                        const ruleId = parseInt(rule.dataset.ruleId);
-                        const oldIndex = previousRuleOrder.indexOf(ruleId);
-                        
-                        if (oldIndex !== -1 && oldIndex !== newIndex) {
-                            // Calculate movement distance
-                            const oldPos = originalPositions.get(ruleId);
-                            const newRect = rule.getBoundingClientRect();
-                            const deltaY = oldPos.top - newRect.top;
-                            
-                            // Apply initial transform (starting position)
-                            rule.style.transform = 'translateY(${deltaY}px)';
-                            rule.style.transition = 'none';
-                            
-                            // Force reflow
-                            rule.offsetHeight;
-                            
-                            // Animate to final position
-                            rule.style.transition = 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                            rule.style.transform = 'translateY(0)';
-                            
-                            // Add visual feedback
-                            rule.classList.add('sliding');
-                            
-                            // Clean up after animation
-                            setTimeout(() => {
-                                rule.style.transform = '';
-                                rule.style.transition = '';
-                                rule.classList.remove('sliding');
-                                
-                                // Check if this was the last rule to animate
-                                if (!document.querySelector('.sliding')) {
-                                    isAnimating = false;
-                                    processPendingUpdate();
-                                }
-                            }, 800);
-                        }
-                    });
-                    
-                    // If no rules actually moved, reset animation state
-                    if (!document.querySelector('.sliding')) {
-                        isAnimating = false;
-                        processPendingUpdate();
-                    }
-                } else {
-                    // No repositioning needed, process any pending updates
-                    processPendingUpdate();
-                }
-                
-                previousRuleOrder = [...currentOrder];
-            }
-            
-            // Monitor for CSS animations and update isAnimating state
-            rulesContainer.addEventListener('animationstart', function(e) {
-                if (e.animationName === 'fadeInRule' || e.animationName === 'simpleFadeColor') {
-                    isAnimating = true;
-                }
-            });
-            
-            rulesContainer.addEventListener('animationend', function(e) {
-                if (e.animationName === 'fadeInRule' || e.animationName === 'simpleFadeColor') {
-                    // Check if any other animations are still running
-                    setTimeout(() => {
-                        const activeAnimations = rulesContainer.querySelectorAll('.newly-revealed, .newly-satisfied');
-                        if (activeAnimations.length === 0) {
-                            isAnimating = false;
-                            processPendingUpdate();
-                        }
-                    }, 50);
-                }
+                // Trigger FLIP animation (LAST and INVERT + PLAY)
+                requestAnimationFrame(() => {
+                    flipAnimator.animateToLast();
+                });
             });
         });
     </script>
