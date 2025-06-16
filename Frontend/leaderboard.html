@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <title>Password Game - Leaderboard</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <!-- Pure CSS Sidebar Toggle -->
+    <input type="checkbox" id="navcheck" role="button" title="menu">
+    <label for="navcheck" aria-hidden="true" title="menu">
+        <span class="burger">
+            <span class="bar">
+                <span class="visuallyhidden">Menu</span>
+            </span>
+        </span>
+    </label>
+    
+    <!-- Pure CSS Navigation -->
+    <nav id="menu">
+        <a href="/">
+            <span class="menu-icon">🏠</span>
+            <span class="menu-text">Password Game</span>
+        </a>
+        <a href="/leaderboard">
+            <span class="menu-icon">🏆</span>
+            <span class="menu-text">Leaderboard</span>
+        </a>
+    </nav>
+    
+    <main>
+        <div class="content">
+            <div class="container">
+                <div class="leaderboard-container">
+                    <h1 class="leaderboard-title">🏆 Leaderboard</h1>
+                    <div class="leaderboard-content">
+                        <h2 class="leaderboard-message">Hello World!</h2>
+                        <p class="leaderboard-placeholder">This is a placeholder for the leaderboard functionality.</p>
+                        <p class="leaderboard-coming-soon">Coming soon: Player rankings, scores, and achievements!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
