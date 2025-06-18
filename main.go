@@ -16,6 +16,12 @@ import (
 	"passgame/rules/basic" // Basic rules package
 )
 
+// Global template variable - parse all templates at startup
+var tmpl = template.Must(template.ParseFiles(
+	"Frontend/display.html",
+	"Frontend/user-modal.html",
+))
+
 type PageData struct {
 	Password string
 	Rules    []basic.Rule
@@ -218,8 +224,17 @@ func handlePasswordGame(w http.ResponseWriter, r *http.Request) {
 	// Check if user has a session
 	userSession := getUserSession(r)
 	if userSession == nil {
-		// Show registration modal
-		http.ServeFile(w, r, "Frontend/display.html")
+		// Show registration modal by executing display.html template with no user session
+		data := TemplateData{
+			Title:       "The Ultimate Password Game",
+			UserSession: nil, // This will trigger the modal to show
+		}
+
+		err := tmpl.ExecuteTemplate(w, "display.html", data)
+		if err != nil {
+			log.Printf("Error executing display template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -243,17 +258,24 @@ func handlePasswordGame(w http.ResponseWriter, r *http.Request) {
 		UserSession:        userSession,
 	}
 
-	// Parse and execute the display.html template from Frontend directory
-	tmpl, err := template.ParseFiles("Frontend/display.html")
+	// Execute the display.html template with data
+	err := tmpl.ExecuteTemplate(w, "display.html", data)
 	if err != nil {
-		log.Printf("Error parsing template: %v", err)
+		log.Printf("Error executing display template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+}
 
-	err = tmpl.Execute(w, data)
+// Handle user modal requests
+func handleUserModal(w http.ResponseWriter, r *http.Request) {
+	data := TemplateData{
+		Title: "User Registration",
+	}
+
+	err := tmpl.ExecuteTemplate(w, "user-modal.html", data)
 	if err != nil {
-		log.Printf("Error executing template: %v", err)
+		log.Printf("Error executing user-modal template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -281,7 +303,7 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal([]byte(states), &stateMap); err == nil {
 			previousSatisfiedStates = make([]bool, 20) // Assuming 20 rules
 			for i := 0; i < 20; i++ {
-				previousSatisfiedStates[i] = stateMap[strconv.Itoa(i)]
+				previousSatisfiedStates[i] = stateMap[strconv.Itoa(i+1)] // Rule IDs start from 1
 			}
 		}
 	}
@@ -293,7 +315,7 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal([]byte(states), &stateMap); err == nil {
 			previousVisibleStates = make([]bool, 20) // Assuming 20 rules
 			for i := 0; i < 20; i++ {
-				previousVisibleStates[i] = stateMap[strconv.Itoa(i)]
+				previousVisibleStates[i] = stateMap[strconv.Itoa(i+1)] // Rule IDs start from 1
 			}
 		}
 	}
@@ -301,24 +323,36 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	ruleSet := basic.NewRuleSet()
 	basic.ValidatePassword(ruleSet, password, previousSatisfiedStates, previousVisibleStates)
 
-	// Update user progress
-	maxRuleReached := 0
+	// *** CHANGED: Only update database when rules are newly satisfied ***
+	// Track if we need to update the database
+	shouldUpdateDB := false
+	highestNewlySatisfiedRule := 0
+
+	// Check for newly satisfied rules
 	for _, rule := range ruleSet.Rules {
-		if rule.IsVisible {
-			if rule.ID > maxRuleReached {
-				maxRuleReached = rule.ID
+		if rule.NewlySatisfied {
+			shouldUpdateDB = true
+			if rule.ID > highestNewlySatisfiedRule {
+				highestNewlySatisfiedRule = rule.ID
 			}
+			log.Printf("✅ Rule %d newly satisfied for user %s", rule.ID, userSession.Username)
 		}
 	}
 
-	// Update session and database if new max rule reached
-	if maxRuleReached > userSession.MaxRule {
-		userSession.MaxRule = maxRuleReached
+	// Only update database if there are newly satisfied rules AND it's a higher rule than previously reached
+	if shouldUpdateDB && highestNewlySatisfiedRule > userSession.MaxRule {
 		timeSpent := int(time.Since(userSession.StartTime).Seconds())
 
-		err := database.UpdateUserProgress(userSession.UserID, maxRuleReached, timeSpent)
+		// Update max rule reached in session
+		userSession.MaxRule = highestNewlySatisfiedRule
+
+		// Update database
+		err := database.UpdateUserProgress(userSession.UserID, highestNewlySatisfiedRule, timeSpent)
 		if err != nil {
-			log.Printf("Error updating user progress: %v", err)
+			log.Printf("Error updating user progress for rule %d: %v", highestNewlySatisfiedRule, err)
+		} else {
+			log.Printf("📈 Database updated for user %s: Rule %d satisfied in %ds",
+				userSession.Username, highestNewlySatisfiedRule, timeSpent)
 		}
 	}
 
@@ -332,6 +366,8 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 		err := database.UpdateUserProgress(userSession.UserID, 20, timeSpent) // 20 = all rules completed
 		if err != nil {
 			log.Printf("Error updating completion: %v", err)
+		} else {
+			log.Printf("🎉 Game completed by user %s in %d seconds!", userSession.Username, timeSpent)
 		}
 	}
 
@@ -359,9 +395,9 @@ func handleValidate(w http.ResponseWriter, r *http.Request) {
 	// Send the satisfied and visible states back to client
 	satisfiedStateMap := make(map[string]bool)
 	visibleStateMap := make(map[string]bool)
-	for i, rule := range ruleSet.Rules {
-		satisfiedStateMap[strconv.Itoa(i)] = rule.IsSatisfied
-		visibleStateMap[strconv.Itoa(i)] = rule.IsVisible
+	for _, rule := range ruleSet.Rules {
+		satisfiedStateMap[strconv.Itoa(rule.ID)] = rule.IsSatisfied
+		visibleStateMap[strconv.Itoa(rule.ID)] = rule.IsVisible
 	}
 
 	if statesJSON, err := json.Marshal(satisfiedStateMap); err == nil {
@@ -395,6 +431,7 @@ func main() {
 	http.HandleFunc("/display", handlePasswordGame)
 	http.HandleFunc("/validate", handleValidate)
 	http.HandleFunc("/register-user", handleRegisterUser)
+	http.HandleFunc("/user-modal.html", handleUserModal) // Now uses template execution
 	http.HandleFunc("/leaderboard", component.HandleLeaderboard)
 
 	// Serve static files from Frontend directory
@@ -406,11 +443,6 @@ func main() {
 	http.HandleFunc("/flip-animations.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		http.ServeFile(w, r, "Frontend/flip-animations.js")
-	})
-
-	http.HandleFunc("/user-modal.html", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		http.ServeFile(w, r, "Frontend/user-modal.html")
 	})
 
 	log.Println("🚀 Password Game server starting on :8080")
