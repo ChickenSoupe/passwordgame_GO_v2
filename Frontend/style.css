@@ -177,8 +177,9 @@ label[for="navcheck"]:hover .burger {
 #menu a:hover,
 #menu a:focus {
     color: #ecf0f1;
-    background: rgba(255, 0, 0, 0.757);
+    background: rgba(131, 211, 207, 0.757);
     border-left-color: var(--nav-accent-color);
+    width: fit-content;
     
 }
 
@@ -463,6 +464,186 @@ body {
     z-index: 10;
 }
 
+/* Dialog Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.modal-container {
+    background: linear-gradient(135deg, #f5e6d3 0%, #e8dcc6 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease-out;
+    border: 3px solid #ddd;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #333;
+}
+
+.modal-header h2 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    color: #333;
+}
+
+.modal-header p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    margin: 0;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 1rem;
+    border: 3px solid #ddd;
+    border-radius: 12px;
+    background: white;
+    color: #333;
+    font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.form-group input::placeholder {
+    color: #666;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #4caf50;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2), 0 8px 24px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.form-group select option {
+    background: white;
+    color: #333;
+}
+
+.input-hint {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.form-actions {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.btn-primary {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    min-width: 200px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    color: #333;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(51, 51, 51, 0.3);
+    border-top: 2px solid #333;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-message {
+    background: rgba(244, 67, 54, 0.1);
+    border: 2px solid rgba(244, 67, 54, 0.3);
+    color: #d32f2f;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.success-message {
+    background: rgba(76, 175, 80, 0.1);
+    border: 2px solid rgba(76, 175, 80, 0.3);
+    color: #2e7d32;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
 /* Leaderboard Styles */
 .leaderboard-container {
     padding: 40px;
@@ -554,6 +735,21 @@ body {
     #navcheck:checked ~ main .content {
         transform: translateX(1em);
         filter: blur(1px);
+    }
+    
+    .modal-container {
+        width: 95%;
+        padding: 1.5rem;
+        margin: 1rem;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .btn-primary {
+        width: 100%;
+        min-width: auto;
     }
 }
 
