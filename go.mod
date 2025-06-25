@@ -2,8 +2,13 @@ module passgame
 
 go 1.24.3
 
-require modernc.org/sqlite v1.38.0
+//direct dependencies
+require (
+	github.com/dchest/captcha v1.1.0
+	modernc.org/sqlite v1.38.0
+)
 
+//indirect dependencies
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect

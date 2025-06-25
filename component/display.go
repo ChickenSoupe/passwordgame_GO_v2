@@ -52,6 +52,12 @@ const rulesPartialTemplate = `{{range .SortedRules}}
     <div class="rule-number">{{.ID}}</div>
     <div class="rule-content">
         <div class="rule-text">{{.Description}}</div>
+        {{if .HasCaptcha}}
+        <div class="captcha-container">
+            <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
+            <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
+        </div>
+        {{end}}
         {{if not .IsSatisfied}}
         <div class="rule-hint">{{.Hint}}</div>
         {{end}}

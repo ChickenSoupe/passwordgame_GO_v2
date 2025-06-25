@@ -7,6 +7,7 @@ import (
 
 	database "passgame/Database"
 	"passgame/component"
+	"passgame/rules/fun"
 )
 
 func main() {
@@ -29,6 +30,10 @@ func main() {
 	http.HandleFunc("/register-user", component.HandleRegisterUser)
 	http.HandleFunc("/user-modal.html", component.HandleUserModal) // Now uses template execution
 	http.HandleFunc("/leaderboard", component.HandleLeaderboard)
+	
+	// Captcha routes
+	http.HandleFunc("/captcha.png", fun.ServeCaptchaImage)
+	http.HandleFunc("/refresh-captcha", fun.RefreshCaptcha)
 
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {

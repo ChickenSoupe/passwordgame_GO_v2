@@ -203,6 +203,30 @@
             ruleStateManager.updateStates(initialSatisfied, initialVisible);
             console.log('Initial rule states:', { satisfied: initialSatisfied, visible: initialVisible });
         });
+
+        // Captcha refresh function
+        function refreshCaptcha(ruleId) {
+            fetch('/refresh-captcha', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Add timestamp to force image reload
+                        const captchaImg = document.getElementById('captcha-' + ruleId);
+                        if (captchaImg) {
+                            captchaImg.src = '/captcha.png?' + new Date().getTime();
+                        }
+                        
+                        // Re-validate password after captcha refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            htmx.trigger(passwordInput, 'htmx:trigger');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing captcha:', error);
+                });
+        }
     </script>
 </body>
 </html>

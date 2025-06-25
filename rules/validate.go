@@ -17,6 +17,7 @@ type Rule struct {
 	NewlyRevealed  bool
 	NewlySatisfied bool
 	IsVisible      bool
+	HasCaptcha     bool
 }
 
 // RuleSet contains a collection of rules for password validation
@@ -68,6 +69,7 @@ func NewRuleSet(difficulty string) *RuleSet {
 				Description: r.Description,
 				Validator:   r.Validator,
 				Hint:        r.Hint,
+				HasCaptcha:  r.HasCaptcha,
 			})
 		}
 	default:
