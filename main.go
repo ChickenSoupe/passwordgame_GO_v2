@@ -1,13 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
 	database "passgame/Database"
 	"passgame/component"
-	"passgame/rules/fun"
+	"passgame/rules"
 )
 
 func main() {
@@ -32,8 +34,8 @@ func main() {
 	http.HandleFunc("/leaderboard", component.HandleLeaderboard)
 	
 	// Captcha routes
-	http.HandleFunc("/captcha.png", fun.ServeCaptchaImage)
-	http.HandleFunc("/refresh-captcha", fun.RefreshCaptcha)
+	http.HandleFunc("/captcha.png", rules.ServeCaptchaImage)
+	http.HandleFunc("/refresh-captcha", rules.RefreshCaptcha)
 
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +46,63 @@ func main() {
 	http.HandleFunc("/flip-animations.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		http.ServeFile(w, r, "Frontend/flip-animations.js")
+	})
+
+	// Admin API endpoints
+	http.HandleFunc("/api/rules/pool", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rules.Pool())
+	})
+
+	http.HandleFunc("/api/rules/assignments", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			data, err := ioutil.ReadFile("rules/assignments.json")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"Could not read assignments"}`))
+				return
+			}
+			w.Write(data)
+			return
+		} else if r.Method == http.MethodPost {
+			var assignments map[string][]int
+			if err := json.NewDecoder(r.Body).Decode(&assignments); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error":"Invalid JSON"}`))
+				return
+			}
+			data, err := json.MarshalIndent(assignments, "", "  ")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"Could not marshal assignments"}`))
+				return
+			}
+			if err := ioutil.WriteFile("rules/assignments.json", data, 0644); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"Could not write assignments"}`))
+				return
+			}
+			w.Write([]byte(`{"status":"ok"}`))
+			return
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+
+	http.HandleFunc("/api/difficulties", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		difficulties, err := component.LoadDifficulties()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"Could not load difficulties"}`))
+			return
+		}
+		json.NewEncoder(w).Encode(difficulties)
+	})
+
+	http.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "Frontend/admin.html")
 	})
 
 	log.Println("🚀 Password Game server starting on :8080")

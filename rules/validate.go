@@ -1,24 +1,11 @@
 package rules
 
 import (
-	"passgame/rules/basic"
-	"passgame/rules/fun"
-	"passgame/rules/hard"
-	"passgame/rules/intermediate"
+	"encoding/json"
+	"log"
+	"os"
+	"sort"
 )
-
-// Rule represents a password validation rule
-type Rule struct {
-	ID             int
-	Description    string
-	Validator      func(string) bool
-	IsSatisfied    bool
-	Hint           string
-	NewlyRevealed  bool
-	NewlySatisfied bool
-	IsVisible      bool
-	HasCaptcha     bool
-}
 
 // RuleSet contains a collection of rules for password validation
 type RuleSet struct {
@@ -26,64 +13,46 @@ type RuleSet struct {
 	Difficulty string
 }
 
-// NewRuleSet creates a new rule set based on the difficulty level
+// NewRuleSet creates a new rule set based on the difficulty level using the pool and assignments.json
 func NewRuleSet(difficulty string) *RuleSet {
 	var rules []Rule
 
-	switch difficulty {
-	case "basic":
-		basicRules := basic.GetRules()
-		for _, r := range basicRules {
-			rules = append(rules, Rule{
-				ID:          r.ID,
-				Description: r.Description,
-				Validator:   r.Validator,
-				Hint:        r.Hint,
-			})
-		}
-	case "intermediate":
-		intermediateRules := intermediate.GetRules()
-		for _, r := range intermediateRules {
-			rules = append(rules, Rule{
-				ID:          r.ID,
-				Description: r.Description,
-				Validator:   r.Validator,
-				Hint:        r.Hint,
-			})
-		}
-	case "hard":
-		hardRules := hard.GetRules()
-		for _, r := range hardRules {
-			rules = append(rules, Rule{
-				ID:          r.ID,
-				Description: r.Description,
-				Validator:   r.Validator,
-				Hint:        r.Hint,
-			})
-		}
-	case "fun":
-		funRules := fun.GetRules()
-		for _, r := range funRules {
-			rules = append(rules, Rule{
-				ID:          r.ID,
-				Description: r.Description,
-				Validator:   r.Validator,
-				Hint:        r.Hint,
-				HasCaptcha:  r.HasCaptcha,
-			})
-		}
-	default:
-		// Default to basic if unknown difficulty
-		basicRules := basic.GetRules()
-		for _, r := range basicRules {
-			rules = append(rules, Rule{
-				ID:          r.ID,
-				Description: r.Description,
-				Validator:   r.Validator,
-				Hint:        r.Hint,
-			})
-		}
+	// Load assignments.json
+	assignmentsFile, err := os.Open("rules/assignments.json")
+	if err != nil {
+		log.Printf("Warning: Could not open assignments.json: %v", err)
+		// fallback: return basic rules from pool
+		basicRules := GetRulesByCategory("basic")
+		return &RuleSet{Rules: basicRules, Difficulty: difficulty}
 	}
+	defer assignmentsFile.Close()
+
+	var assignments map[string][]int
+	if err := json.NewDecoder(assignmentsFile).Decode(&assignments); err != nil {
+		log.Printf("Warning: Could not decode assignments.json: %v", err)
+		// fallback: return basic rules from pool
+		basicRules := GetRulesByCategory("basic")
+		return &RuleSet{Rules: basicRules, Difficulty: difficulty}
+	}
+
+	// Get rule IDs for the specified difficulty
+	ruleIDs, exists := assignments[difficulty]
+	if !exists {
+		log.Printf("Warning: Difficulty '%s' not found in assignments, using basic", difficulty)
+		// fallback: return basic rules from pool
+		basicRules := GetRulesByCategory("basic")
+		return &RuleSet{Rules: basicRules, Difficulty: difficulty}
+	}
+
+	// Get rules from pool by IDs
+	rules = GetRulesByIDs(ruleIDs)
+	
+	// Sort rules by ID to ensure consistent ordering
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].ID < rules[j].ID
+	})
+
+	log.Printf("Created RuleSet for difficulty '%s' with %d rules: %v", difficulty, len(rules), ruleIDs)
 
 	return &RuleSet{
 		Rules:      rules,

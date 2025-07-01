@@ -20,7 +20,8 @@
                        minlength="3" 
                        maxlength="20"
                        placeholder="Enter your username"
-                       autocomplete="off">
+                       autocomplete="off"
+                       oninput="checkAdminTrigger(this.value)">
                 <div class="input-hint">3-20 characters, must be unique</div>
             </div>
             
@@ -28,10 +29,9 @@
                 <label for="difficulty">Difficulty Level:</label>
                 <select id="difficulty" name="difficulty" required>
                     <option value="">Select difficulty...</option>
-                    <option value="basic">🟢 Basic - Standard rules</option>
-                    <option value="intermediate">🟡 Intermediate - More challenging</option>
-                    <option value="hard">🔴 Hard - Expert level</option>
-                    <option value="fun">🎉 Fun - Quirky rules</option>
+                    {{range $key, $diff := .Difficulties}}
+                    <option value="{{$key}}">{{$diff.Icon}} {{$diff.Name}} - {{$diff.Description}}</option>
+                    {{end}}
                 </select>
                 <div class="input-hint">Choose your challenge level!</div>
             </div>
@@ -241,4 +241,88 @@
         min-width: auto;
     }
 }
+
+/* Admin trigger styles */
+.admin-trigger-hint {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    font-size: 0.9rem;
+    z-index: 10001;
+    animation: slideInRight 0.3s ease-out;
+    border-left: 4px solid #667eea;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
 </style>
+
+<script>
+function checkAdminTrigger(value) {
+    const adminTrigger = "admin";
+    if (value.toLowerCase() === adminTrigger) {
+        // Show admin access hint
+        showAdminHint();
+        
+        // Add admin link to sidebar if not already present
+        addAdminToSidebar();
+    }
+}
+
+function showAdminHint() {
+    // Remove existing hint if present
+    const existingHint = document.querySelector('.admin-trigger-hint');
+    if (existingHint) {
+        existingHint.remove();
+    }
+    
+    // Create and show new hint
+    const hint = document.createElement('div');
+    hint.className = 'admin-trigger-hint';
+    hint.innerHTML = '🛠️ Admin access detected! Check the sidebar for admin panel.';
+    document.body.appendChild(hint);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (hint.parentNode) {
+            hint.remove();
+        }
+    }, 5000);
+}
+
+function addAdminToSidebar() {
+    const sidebar = document.getElementById('menu');
+    if (!sidebar) return;
+    
+    // Check if admin link already exists
+    const existingAdminLink = sidebar.querySelector('a[href="/admin"]');
+    if (existingAdminLink) return;
+    
+    // Create admin link
+    const adminLink = document.createElement('a');
+    adminLink.href = '/admin';
+    adminLink.innerHTML = `
+        <span class="menu-icon">🛠️</span>
+        <span class="menu-text">Admin Panel</span>
+    `;
+    adminLink.style.borderTop = '1px solid rgba(255, 255, 255, 0.1)';
+    adminLink.style.marginTop = '10px';
+    adminLink.style.paddingTop = '15px';
+    
+    // Add to sidebar
+    sidebar.appendChild(adminLink);
+}
+</script>

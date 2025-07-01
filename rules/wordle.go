@@ -1,4 +1,4 @@
-package wordle
+package rules
 
 import (
 	"context"

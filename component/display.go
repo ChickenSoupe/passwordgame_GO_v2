@@ -77,6 +77,7 @@ type TemplateData struct {
 	RuleChanges        RuleChangeAnalysis
 	Title              string
 	UserSession        *UserSession
+	Difficulties       map[string]DifficultyConfig
 }
 
 func analyzeRuleChanges(currentRules []rules.Rule, previousSatisfied, previousVisible []bool) RuleChangeAnalysis {
@@ -262,11 +263,17 @@ func HandlePasswordGame(w http.ResponseWriter, r *http.Request) {
 
 // HandleUserModal handles user modal requests
 func HandleUserModal(w http.ResponseWriter, r *http.Request) {
-	data := TemplateData{
-		Title: "User Registration",
+	difficulties, err := LoadDifficulties()
+	if err != nil {
+		log.Printf("Warning: Could not load difficulties: %v", err)
 	}
 
-	err := tmpl.ExecuteTemplate(w, "user-modal.html", data)
+	data := TemplateData{
+		Title:        "User Registration",
+		Difficulties: difficulties,
+	}
+
+	err = tmpl.ExecuteTemplate(w, "user-modal.html", data)
 	if err != nil {
 		log.Printf("Error executing user-modal template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

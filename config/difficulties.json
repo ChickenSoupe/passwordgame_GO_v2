@@ -1,0 +1,32 @@
+{
+  "basic": {
+    "name": "Basic",
+    "icon": "🟢",
+    "color": "#4CAF50",
+    "description": "Standard rules"
+  },
+  "intermediate": {
+    "name": "Intermediate", 
+    "icon": "🟡",
+    "color": "#FF9800",
+    "description": "More challenging"
+  },
+  "hard": {
+    "name": "Hard",
+    "icon": "🔴", 
+    "color": "#F44336",
+    "description": "Expert level"
+  },
+  "expert": {
+    "name": "Expert",
+    "icon": "🟣",
+    "color": "#9C27B0", 
+    "description": "Master level"
+  },
+  "fun": {
+    "name": "Fun",
+    "icon": "🎉",
+    "color": "#E91E63",
+    "description": "Quirky rules"
+  }
+}
