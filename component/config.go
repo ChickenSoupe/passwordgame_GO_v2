@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"strings"
 )
 
 // DifficultyConfig represents the configuration for a difficulty level
@@ -12,6 +13,26 @@ type DifficultyConfig struct {
 	Icon        string `json:"icon"`
 	Color       string `json:"color"`
 	Description string `json:"description"`
+}
+
+// ValidateDifficulty checks if the given difficulty is valid according to the loaded configuration
+func ValidateDifficulty(difficulty string) bool {
+	if difficulty == "all" {
+		return true
+	}
+
+	diffs, err := LoadDifficulties()
+	if err != nil {
+		return false
+	}
+
+	// Check against loaded difficulties (case-insensitive)
+	for k := range diffs {
+		if strings.EqualFold(difficulty, k) {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadDifficulties loads difficulty configurations from JSON file

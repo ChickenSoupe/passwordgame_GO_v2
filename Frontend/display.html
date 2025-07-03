@@ -66,7 +66,6 @@
                 </div>
                 <div id="rules-container" class="rules-container">
                     <div class="rule-item initially-hidden" data-rule-id="1">
-                        <div class="rule-number">1</div>
                         <div class="rule-content">
                             <div class="rule-text">Your password must be at least 5 characters</div>
                             <div class="rule-hint">Try adding more characters</div>
@@ -225,6 +224,30 @@
                 })
                 .catch(error => {
                     console.error('Error refreshing captcha:', error);
+                });
+        }
+
+        // Chess refresh function
+        function refreshChess(ruleId) {
+            fetch('/refresh-chess', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Add timestamp to force image reload
+                        const chessImg = document.getElementById('chess-' + ruleId);
+                        if (chessImg) {
+                            chessImg.src = '/chess.png?' + new Date().getTime();
+                        }
+                        
+                        // Re-validate password after chess refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            htmx.trigger(passwordInput, 'htmx:trigger');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing chess:', error);
                 });
         }
     </script>

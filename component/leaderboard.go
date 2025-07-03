@@ -1,10 +1,12 @@
 package component
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	database "passgame/Database"
@@ -12,14 +14,16 @@ import (
 
 // LeaderboardData holds data for the leaderboard template
 type LeaderboardData struct {
-	Title     string
-	Users     []database.User
-	Stats     map[string]interface{}
-	HasUsers  bool
-	ErrorMsg  string
-	SortBy    string
-	SortOrder string
-	IsHtmx    bool
+	Title        string
+	Users        []database.User
+	Stats        map[string]interface{}
+	Difficulties map[string]database.DifficultyConfig
+	HasUsers     bool
+	ErrorMsg     string
+	SortBy       string
+	SortOrder    string
+	Difficulty   string
+	IsHtmx       bool
 }
 
 // HandleLeaderboard handles the leaderboard page
@@ -27,35 +31,50 @@ func HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	// Check if this is an HTMX request
 	isHtmx := r.Header.Get("HX-Request") == "true"
 
+	// Load difficulties from config
+	difficulties, err := database.LoadDifficulties()
+	if err != nil {
+		log.Printf("Warning: Could not load difficulties: %v", err)
+		// Use empty map as fallback - the database has its own defaults
+		difficulties = make(map[string]database.DifficultyConfig)
+	}
+
 	// Get sort parameters from URL with defaults
 	sortBy := getQueryParam(r, "sort", "rule")
 	sortOrder := getQueryParam(r, "order", "desc")
-	difficulty := getQueryParam(r, "difficulty", "")
+	difficulty := getQueryParam(r, "difficulty", "all")
 
 	// Get leaderboard data with sorting and filtering
 	var users []database.User
-	var err error
+	var leaderboardErr error
 
-	if difficulty != "" && difficulty != "all" {
-		users, err = database.GetLeaderboardByDifficulty(difficulty, 20, sortBy, sortOrder)
+	if difficulty != "all" {
+		// Validate the difficulty parameter
+		if !database.ValidateDifficulty(difficulty) {
+			handleLeaderboardError(w, "Invalid difficulty level", isHtmx)
+			return
+		}
+		users, leaderboardErr = database.GetLeaderboardByDifficulty(difficulty, 20, sortBy, sortOrder)
 	} else {
-		users, err = database.GetLeaderboardSorted(20, sortBy, sortOrder)
+		users, leaderboardErr = database.GetLeaderboardSorted(20, sortBy, sortOrder)
 	}
 
-	if err != nil {
-		log.Printf("Error getting leaderboard: %v", err)
+	if leaderboardErr != nil {
+		log.Printf("Error getting leaderboard: %v", leaderboardErr)
 		handleLeaderboardError(w, "Failed to load leaderboard data", isHtmx)
 		return
 	}
 
 	// Prepare data for template
 	data := LeaderboardData{
-		Title:     "Password Game - Leaderboard",
-		Users:     users,
-		HasUsers:  len(users) > 0,
-		SortBy:    sortBy,
-		SortOrder: sortOrder,
-		IsHtmx:    isHtmx,
+		Title:        "Password Game - Leaderboard",
+		Users:        users,
+		Difficulties: difficulties,
+		HasUsers:     len(users) > 0,
+		SortBy:       sortBy,
+		SortOrder:    sortOrder,
+		Difficulty:   difficulty,
+		IsHtmx:       isHtmx,
 	}
 
 	// For full page loads, get additional stats
@@ -134,6 +153,13 @@ func getTemplateFunctions() template.FuncMap {
 		"getSortIcon":        getSortIcon,
 		"toggleSortOrder":    toggleSortOrder,
 		"getNextDifficulty":  getNextDifficulty,
+		"json": func(v interface{}) (template.JS, error) {
+			a, err := json.Marshal(v)
+			if err != nil {
+				return "", fmt.Errorf("json.Marshal error: %v", err)
+			}
+			return template.JS(a), nil
+		},
 	}
 }
 
@@ -210,33 +236,27 @@ func getRank(index int) int {
 }
 
 func getDifficultyIcon(difficulty string) string {
-	switch difficulty {
-	case "basic":
-		return "🟢"
-	case "intermediate":
-		return "🟡"
-	case "hard":
-		return "🔴"
-	case "fun":
-		return "🎉"
-	default:
+	difficulties, err := database.LoadDifficulties()
+	if err != nil {
 		return "⚪"
 	}
+
+	if diff, exists := difficulties[strings.ToLower(difficulty)]; exists {
+		return diff.Icon
+	}
+	return "⚪"
 }
 
 func getDifficultyColor(difficulty string) string {
-	switch difficulty {
-	case "basic":
-		return "#4ade80"
-	case "intermediate":
-		return "#facc15"
-	case "hard":
-		return "#f87171"
-	case "fun":
-		return "#a78bfa"
-	default:
+	difficulties, err := database.LoadDifficulties()
+	if err != nil {
 		return "#64748b"
 	}
+
+	if diff, exists := difficulties[strings.ToLower(difficulty)]; exists {
+		return diff.Color
+	}
+	return "#64748b"
 }
 
 func getSortIcon(currentSort, columnSort, currentOrder string) string {
@@ -261,20 +281,39 @@ func toggleSortOrder(currentSort, columnSort, currentOrder string) string {
 
 // getNextDifficulty cycles through difficulty filters
 func getNextDifficulty(currentDifficulty string) string {
-	switch currentDifficulty {
-	case "all":
-		return "basic"
-	case "basic":
-		return "intermediate"
-	case "intermediate":
-		return "hard"
-	case "hard":
-		return "fun"
-	case "fun":
+	difficulties, err := database.LoadDifficulties()
+	if err != nil {
 		return "all"
-	default:
-		return "basic"
 	}
+
+	if currentDifficulty == "all" {
+		// Return the first difficulty in the map
+		for key := range difficulties {
+			return key
+		}
+	}
+
+	// Convert map keys to slice for ordered access
+	var keys []string
+	for key := range difficulties {
+		keys = append(keys, key)
+	}
+
+	// Find current difficulty in the slice
+	for i, key := range keys {
+		if key == currentDifficulty {
+			if i == len(keys)-1 {
+				return "all"
+			}
+			return keys[i+1]
+		}
+	}
+
+	// If not found, return first difficulty
+	if len(keys) > 0 {
+		return keys[0]
+	}
+	return "all"
 }
 
 // leaderboardTemplate is the HTML template for the full leaderboard page
@@ -415,7 +454,7 @@ const leaderboardTemplate = `<!DOCTYPE html>
                 <div id="error-message"></div>
                 
                 <!-- Leaderboard Content -->
-                <div id="leaderboard-content" class="table-responsive">
+                <div id="leaderboard-content" class="table-responsive" data-difficulties='{{.Difficulties | json}}'>
                     {{template "leaderboard-table" .}}
                 </div>
             </div>
@@ -426,7 +465,8 @@ const leaderboardTemplate = `<!DOCTYPE html>
         // Store current state
         let currentSort = '{{.SortBy}}';
         let currentOrder = '{{.SortOrder}}';
-        let currentDifficulty = 'all';
+        let currentDifficulty = '{{if .Difficulty}}{{.Difficulty}}{{else}}all{{end}}';
+        const difficulties = JSON.parse(document.querySelector('[data-difficulties]')?.dataset.difficulties || '{}');
         
         document.addEventListener('DOMContentLoaded', function() {
             {{if .Stats}}
@@ -458,11 +498,19 @@ const leaderboardTemplate = `<!DOCTYPE html>
         }
         
         function handleDifficultyFilter(element) {
-            // Cycle through difficulty filters
-            const difficulties = ['all', 'basic', 'intermediate', 'hard', 'fun'];
-            const currentIndex = difficulties.indexOf(currentDifficulty);
-            const nextIndex = (currentIndex + 1) % difficulties.length;
-            currentDifficulty = difficulties[nextIndex];
+            // Get all available difficulties
+            const difficultyKeys = Object.keys(difficulties);
+            const allDifficulties = ['all', ...difficultyKeys];
+            
+            // Find current difficulty or default to 'all'
+            let currentIndex = allDifficulties.indexOf(currentDifficulty);
+            if (currentIndex === -1) {
+                currentIndex = 0; // Default to 'all' if current difficulty is invalid
+            }
+            
+            // Get next difficulty, wrapping around
+            const nextIndex = (currentIndex + 1) % allDifficulties.length;
+            currentDifficulty = allDifficulties[nextIndex];
             
             // Update visual indicator
             updateDifficultyIndicator(element);
@@ -475,7 +523,10 @@ const leaderboardTemplate = `<!DOCTYPE html>
             
             htmx.ajax('GET', url, {
                 target: '#leaderboard-content',
-                swap: 'innerHTML'
+                swap: 'innerHTML',
+                headers: {
+                    'HX-Request': 'true'
+                }
             }).then(() => {
                 setupSortHandlers();
             });
@@ -525,14 +576,9 @@ const leaderboardTemplate = `<!DOCTYPE html>
                 const indicator = document.createElement('span');
                 indicator.className = 'difficulty-filter';
                 
-                const filterTexts = {
-                    'basic': '🟢',
-                    'intermediate': '🟡', 
-                    'hard': '🔴',
-                    'fun': '🎉'
-                };
-                
-                indicator.textContent = filterTexts[currentDifficulty];
+                // Get the difficulty icon from the already parsed difficulties
+                const diffConfig = difficulties[currentDifficulty] || {};
+                indicator.textContent = diffConfig.icon || '⚪';
                 element.appendChild(indicator);
             }
         }
@@ -574,12 +620,17 @@ const leaderboardTemplate = `<!DOCTYPE html>
             const ctx = document.getElementById('difficultyChart');
             if (!ctx) return;
             
-            const difficulties = ['basic', 'intermediate', 'hard', 'fun'];
-            const colors = ['#4ade80', '#facc15', '#f87171', '#a78bfa'];
-            const icons = ['🟢', '🟡', '🔴', '🎉'];
+            // Get difficulties from the data attribute
+            const difficulties = JSON.parse(document.querySelector('[data-difficulties]').dataset.difficulties);
+            const difficultyKeys = Object.keys(difficulties);
             
-            const data = difficulties.map(diff => difficultyData[diff] || 0);
-            const labels = difficulties.map((diff, i) => icons[i] + ' ' + diff.charAt(0).toUpperCase() + diff.slice(1));
+            // Prepare chart data
+            const data = difficultyKeys.map(diff => difficultyData[diff] || 0);
+            const labels = difficultyKeys.map(diff => {
+                const diffConfig = difficulties[diff];
+                return (diffConfig.icon || '⚪') + ' ' + (diffConfig.name || diff);
+            });
+            const colors = difficultyKeys.map(diff => difficulties[diff]?.color || '#64748b');
             
             new Chart(ctx, {
                 type: 'doughnut',
@@ -587,8 +638,8 @@ const leaderboardTemplate = `<!DOCTYPE html>
                     labels: labels,
                     datasets: [{
                         data: data,
-                        backgroundColor: colors,
-                        borderColor: colors.map(color => color + '80'),
+                        backgroundColor: colors.map(c => c + '80'), 
+                        borderColor: colors,
                         borderWidth: 2,
                         hoverOffset: 4
                     }]
@@ -699,7 +750,6 @@ const leaderboardTemplate = `<!DOCTYPE html>
 // leaderboardTableTemplate is the HTML template for just the table portion
 const leaderboardTableTemplate = `{{define "leaderboard-table"}}
 <div id="leaderboard-table">
-    {{if .HasUsers}}
     <div class="table-header">
         <div>Rank</div>
         <div>Player</div>
@@ -725,28 +775,27 @@ const leaderboardTableTemplate = `{{define "leaderboard-table"}}
         </div>
     </div>
     
-    {{range $index, $user := .Users}}
-    <div class="table-row">
-        <div class="rank {{if eq (getRank $index) 1}}gold{{else if eq (getRank $index) 2}}silver{{else if eq (getRank $index) 3}}bronze{{end}}">
-            #{{getRank $index}}
+    {{if .HasUsers}}
+        {{range $index, $user := .Users}}
+        <div class="table-row">
+            <div class="rank {{if eq (getRank $index) 1}}gold{{else if eq (getRank $index) 2}}silver{{else if eq (getRank $index) 3}}bronze{{end}}">
+                #{{getRank $index}}
+            </div>
+            <div class="username">{{$user.Username}}</div>
+            <div>
+                <span class="difficulty-badge" style="background-color: {{getDifficultyColor $user.Difficulty}}20; color: {{getDifficultyColor $user.Difficulty}};">
+                    {{getDifficultyIcon $user.Difficulty}} {{$user.Difficulty}}
+                </span>
+            </div>
+            <div class="rule-progress">{{$user.RuleReached}}</div>
+            <div class="time-spent">{{formatDuration $user.TimeSpent}}</div>
+            <div class="join-date">{{formatTime $user.CreatedAt}}</div>
         </div>
-        <div class="username">{{$user.Username}}</div>
-        <div>
-            <span class="difficulty-badge" style="background-color: {{getDifficultyColor $user.Difficulty}}20; color: {{getDifficultyColor $user.Difficulty}};">
-                {{getDifficultyIcon $user.Difficulty}} {{$user.Difficulty}}
-            </span>
-        </div>
-        <div class="rule-progress">{{$user.RuleReached}}/20</div>
-        <div class="time-spent">{{formatDuration $user.TimeSpent}}</div>
-        <div class="join-date">{{formatTime $user.CreatedAt}}</div>
-    </div>
-    {{end}}
+        {{end}}
     {{else}}
-    <div class="empty-state">
-        <h3>🎮 No Players Yet!</h3>
-        <p>Be the first to join the Password Game challenge!</p>
-        <a href="/" class="btn-primary" style="margin-top: 1rem; display: inline-block;">Start Playing</a>
-    </div>
+        <tr class="no-rows">
+            <td colspan="6" class="text-center">No players found for this difficulty level.</td>
+        </tr>
     {{end}}
 </div>
 {{end}}`

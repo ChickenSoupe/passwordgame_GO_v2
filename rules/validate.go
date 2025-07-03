@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"sync"
 )
 
 // RuleSet contains a collection of rules for password validation
@@ -13,27 +14,50 @@ type RuleSet struct {
 	Difficulty string
 }
 
-// NewRuleSet creates a new rule set based on the difficulty level using the pool and assignments.json
-func NewRuleSet(difficulty string) *RuleSet {
-	var rules []Rule
+// Cache for assignments to avoid repeated file reads
+var (
+	assignmentsCache map[string][]int
+	assignmentsMutex sync.RWMutex
+	assignmentsLoaded bool
+)
 
-	// Load assignments.json
+// loadAssignments loads assignments.json once and caches it
+func loadAssignments() map[string][]int {
+	assignmentsMutex.Lock()
+	defer assignmentsMutex.Unlock()
+	
+	if assignmentsLoaded {
+		return assignmentsCache
+	}
+
 	assignmentsFile, err := os.Open("rules/assignments.json")
 	if err != nil {
 		log.Printf("Warning: Could not open assignments.json: %v", err)
-		// fallback: return basic rules from pool
-		basicRules := GetRulesByCategory("basic")
-		return &RuleSet{Rules: basicRules, Difficulty: difficulty}
+		assignmentsCache = make(map[string][]int)
+		assignmentsLoaded = true
+		return assignmentsCache
 	}
 	defer assignmentsFile.Close()
 
 	var assignments map[string][]int
 	if err := json.NewDecoder(assignmentsFile).Decode(&assignments); err != nil {
 		log.Printf("Warning: Could not decode assignments.json: %v", err)
-		// fallback: return basic rules from pool
-		basicRules := GetRulesByCategory("basic")
-		return &RuleSet{Rules: basicRules, Difficulty: difficulty}
+		assignmentsCache = make(map[string][]int)
+		assignmentsLoaded = true
+		return assignmentsCache
 	}
+
+	assignmentsCache = assignments
+	assignmentsLoaded = true
+	return assignmentsCache
+}
+
+// NewRuleSet creates a new rule set based on the difficulty level using the pool and assignments.json
+func NewRuleSet(difficulty string) *RuleSet {
+	var rules []Rule
+
+	// Load assignments from cache
+	assignments := loadAssignments()
 
 	// Get rule IDs for the specified difficulty
 	ruleIDs, exists := assignments[difficulty]
@@ -46,13 +70,11 @@ func NewRuleSet(difficulty string) *RuleSet {
 
 	// Get rules from pool by IDs
 	rules = GetRulesByIDs(ruleIDs)
-	
+
 	// Sort rules by ID to ensure consistent ordering
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].ID < rules[j].ID
 	})
-
-	log.Printf("Created RuleSet for difficulty '%s' with %d rules: %v", difficulty, len(rules), ruleIDs)
 
 	return &RuleSet{
 		Rules:      rules,
@@ -72,19 +94,14 @@ func ValidatePassword(rs *RuleSet, password string, previousStates []bool, previ
 			oldVisible = previousVisible[i]
 		}
 
-		rs.Rules[i].IsSatisfied = rs.Rules[i].Validator(password)
-
-		// Mark as newly satisfied if it wasn't satisfied before but is now
-		rs.Rules[i].NewlySatisfied = !oldSatisfied && rs.Rules[i].IsSatisfied
-
 		// Sequential rule visibility logic - Once visible, always visible
-		if rs.Rules[i].ID == 1 {
-			// Always show rule 1 (even when password is empty)
+		if rs.Rules[i].ID == 1 || i == 0 {
+			// Always show rule 1 OR the first rule in the set (even when password is empty)
 			rs.Rules[i].IsVisible = true
 		} else if oldVisible {
 			// Keep visible if was previously visible (don't hide once shown)
 			rs.Rules[i].IsVisible = true
-		} else if len(password) > 0 {
+		} else if len(password) > 0 && i > 0 {
 			// For rules 2 and above, check if all previous rules are visible
 			allPreviousVisible := true
 			for j := 0; j < i; j++ {
@@ -98,6 +115,13 @@ func ValidatePassword(rs *RuleSet, password string, previousStates []bool, previ
 			if allPreviousVisible && rs.Rules[i-1].IsSatisfied {
 				rs.Rules[i].IsVisible = true
 			}
+		}
+
+		// Only validate visible rules to improve performance
+		if rs.Rules[i].IsVisible {
+			rs.Rules[i].IsSatisfied = rs.Rules[i].Validator(password)
+			// Mark as newly satisfied if it wasn't satisfied before but is now
+			rs.Rules[i].NewlySatisfied = !oldSatisfied && rs.Rules[i].IsSatisfied
 		}
 
 		// Mark as newly revealed if it wasn't visible before but is now

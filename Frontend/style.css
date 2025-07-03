@@ -374,26 +374,6 @@ body {
     opacity: 0.6;
 }
 
-.rule-number {
-    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-    color: white;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 16px;
-    margin-right: 15px;
-    flex-shrink: 0;
-    transition: all 0.3s ease;
-}
-
-.rule-item.satisfied .rule-number {
-    background: #4caf50;
-    transform: scale(1.1);
-}
 
 .rule-content {
     flex: 1;
@@ -458,6 +438,50 @@ body {
 }
 
 .refresh-captcha-btn:active {
+    transform: scale(0.95);
+}
+
+.chess-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px solid #dee2e6;
+}
+
+.chess-image {
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: white;
+    max-width: 400px;
+    height: auto;
+}
+
+.refresh-chess-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.refresh-chess-btn:hover {
+    background: #218838;
+    transform: scale(1.05);
+}
+
+.refresh-chess-btn:active {
     transform: scale(0.95);
 }
 
@@ -971,11 +995,7 @@ body {
         text-align: center;
     }
     
-    .rule-number {
-        margin-right: 0;
-        margin-bottom: 10px;
-    }
-    
+        
     .checkmark {
         margin-left: 0;
         margin-top: 10px;

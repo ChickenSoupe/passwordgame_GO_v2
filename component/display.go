@@ -14,8 +14,18 @@ import (
 	"passgame/rules" // Unified rules package
 )
 
+// Template functions
+var funcMap = template.FuncMap{
+	"add": func(a, b int) int {
+		return a + b
+	},
+	"subtract": func(a, b int) int {
+		return a - b
+	},
+}
+
 // Global template variable - parse all templates at startup
-var tmpl = template.Must(template.ParseFiles(
+var tmpl = template.Must(template.New("").Funcs(funcMap).ParseFiles(
 	"Frontend/display.html",
 	"Frontend/user-modal.html",
 ))
@@ -47,16 +57,22 @@ type UserSession struct {
 // Global session storage (in production, use Redis or similar)
 var userSessions = make(map[string]*UserSession)
 
-const rulesPartialTemplate = `{{range .SortedRules}}
+const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
 <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}" data-rule-id="{{.ID}}">
-    <div class="rule-number">{{.ID}}</div>
     <div class="rule-content">
         <div class="rule-text">{{.Description}}</div>
         {{if .HasCaptcha}}
+        {{if eq .ID 14}}
         <div class="captcha-container">
             <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
             <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
         </div>
+        {{else if eq .ID 18}}
+        <div class="chess-container">
+            <img src="/chess.png" alt="Chess Board" class="chess-image" id="chess-{{.ID}}">
+            <button type="button" class="refresh-chess-btn" onclick="refreshChess({{.ID}})">🔄</button>
+        </div>
+        {{end}}
         {{end}}
         {{if not .IsSatisfied}}
         <div class="rule-hint">{{.Hint}}</div>
@@ -210,13 +226,48 @@ func HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	// Return success response (you might want to redirect or return JSON)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`<div class="success-message">Account created successfully!</div>`))
 }
 
 // HandlePasswordGame handles the main password game page
 func HandlePasswordGame(w http.ResponseWriter, r *http.Request) {
+	// Check if this is a test session request
+	if r.URL.Query().Get("test_session") == "true" {
+		difficulty := r.URL.Query().Get("difficulty")
+		if difficulty == "" {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
+		// This is a test session, create a temporary session
+		testUser := &UserSession{
+			UserID:     -1, // Negative ID indicates test session
+			Username:   "Test User",
+			Difficulty: difficulty,
+			StartTime:  time.Now(),
+			MaxRule:    0,
+		}
+
+		// Create a temporary session ID for the test session
+		sessionID := "test_" + fmt.Sprint(time.Now().UnixNano())
+		userSessions[sessionID] = testUser
+
+		// Set session cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_session",
+			Value:    sessionID,
+			HttpOnly: true,
+			Path:     "/",
+			MaxAge:   60 * 60, // 1 hour
+		})
+
+		// Redirect to the game
+		http.Redirect(w, r, "/display", http.StatusSeeOther)
+		return
+	}
+
 	// Check if user has a session
 	userSession := getUserSession(r)
+
 	if userSession == nil {
 		// Show registration modal by executing display.html template with no user session
 		data := TemplateData{
@@ -299,7 +350,7 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	// Create rule set based on user's difficulty
 	ruleSet := rules.NewRuleSet(userSession.Difficulty)
-	
+
 	// Get previous satisfied states
 	var previousSatisfiedStates []bool
 	if states := r.Header.Get("X-Satisfied-States"); states != "" {
@@ -412,6 +463,6 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return just the rules partial for HTMX
-	ruleTmpl := template.Must(template.New("rules").Parse(rulesPartialTemplate))
+	ruleTmpl := template.Must(template.New("rules").Funcs(funcMap).Parse(rulesPartialTemplate))
 	ruleTmpl.Execute(w, data)
 }

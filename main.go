@@ -32,10 +32,14 @@ func main() {
 	http.HandleFunc("/register-user", component.HandleRegisterUser)
 	http.HandleFunc("/user-modal.html", component.HandleUserModal) // Now uses template execution
 	http.HandleFunc("/leaderboard", component.HandleLeaderboard)
-	
+
 	// Captcha routes
 	http.HandleFunc("/captcha.png", rules.ServeCaptchaImage)
 	http.HandleFunc("/refresh-captcha", rules.RefreshCaptcha)
+
+	// Chess routes
+	http.HandleFunc("/chess.png", rules.ServeChessImage)
+	http.HandleFunc("/refresh-chess", rules.RefreshChess)
 
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +60,8 @@ func main() {
 
 	http.HandleFunc("/api/rules/assignments", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			data, err := ioutil.ReadFile("rules/assignments.json")
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -65,7 +70,7 @@ func main() {
 			}
 			w.Write(data)
 			return
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			var assignments map[string][]int
 			if err := json.NewDecoder(r.Body).Decode(&assignments); err != nil {
 				w.WriteHeader(http.StatusBadRequest)

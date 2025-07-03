@@ -2,7 +2,9 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 	"time"
@@ -11,6 +13,14 @@ import (
 )
 
 var db *sql.DB
+
+// DifficultyConfig represents the configuration for a difficulty level
+type DifficultyConfig struct {
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	Description string `json:"description"`
+}
 
 // User represents a user in the database
 type User struct {
@@ -38,8 +48,73 @@ var validSortColumns = map[string]string{
 	"username":   "username",
 }
 
-// Valid difficulties for filtering
-var validDifficulties = []string{"basic", "intermediate", "hard", "fun"}
+// LoadDifficulties loads difficulty configurations from JSON file
+func LoadDifficulties() (map[string]DifficultyConfig, error) {
+	data, err := ioutil.ReadFile("config/difficulties.json")
+	if err != nil {
+		log.Printf("Error reading difficulties.json: %v", err)
+		return getDefaultDifficulties(), err
+	}
+
+	var difficulties map[string]DifficultyConfig
+	if err := json.Unmarshal(data, &difficulties); err != nil {
+		log.Printf("Error parsing difficulties.json: %v", err)
+		return getDefaultDifficulties(), err
+	}
+
+	return difficulties, nil
+}
+
+// getDefaultDifficulties returns hardcoded default difficulties as fallback
+func getDefaultDifficulties() map[string]DifficultyConfig {
+	return map[string]DifficultyConfig{
+		"basic": {
+			Name:        "Basic",
+			Icon:        "🟢",
+			Color:       "#4CAF50",
+			Description: "Standard rules",
+		},
+		"intermediate": {
+			Name:        "Intermediate",
+			Icon:        "🟡",
+			Color:       "#FF9800",
+			Description: "More challenging",
+		},
+		"hard": {
+			Name:        "Hard",
+			Icon:        "🔴",
+			Color:       "#F44336",
+			Description: "Expert level",
+		},
+		"expert": {
+			Name:        "Expert",
+			Icon:        "🟣",
+			Color:       "#9C27B0",
+			Description: "Master level",
+		},
+		"fun": {
+			Name:        "Fun",
+			Icon:        "🎉",
+			Color:       "#E91E63",
+			Description: "Quirky rules",
+		},
+	}
+}
+
+// getDynamicDifficulties gets valid difficulties from the config
+func getDynamicDifficulties() []string {
+	difficulties, err := LoadDifficulties()
+	if err != nil {
+		// Fallback to default difficulties if config loading fails
+		return []string{"basic", "intermediate", "hard", "expert", "fun"}
+	}
+	
+	var validDiffs []string
+	for key := range difficulties {
+		validDiffs = append(validDiffs, key)
+	}
+	return validDiffs
+}
 
 // InitDB initializes the SQLite database with improved schema
 func InitDB() error {
@@ -66,7 +141,7 @@ func InitDB() error {
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-		difficulty TEXT NOT NULL CHECK(difficulty IN ('basic', 'intermediate', 'hard', 'fun')),
+		difficulty TEXT NOT NULL CHECK(difficulty IN ('basic', 'intermediate', 'hard', 'expert', 'fun')),
 		rule_reached INTEGER DEFAULT 0 CHECK(rule_reached >= 0 AND rule_reached <= 20),
 		time_spent INTEGER DEFAULT 0 CHECK(time_spent >= 0),
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -124,8 +199,18 @@ func CheckUsernameExists(username string) (bool, error) {
 
 // ValidateDifficulty checks if the difficulty is valid
 func ValidateDifficulty(difficulty string) bool {
-	for _, valid := range validDifficulties {
-		if strings.ToLower(difficulty) == valid {
+	if difficulty == "all" {
+		return true
+	}
+
+	diffs, err := LoadDifficulties()
+	if err != nil {
+		return false
+	}
+
+	// Check against loaded difficulties (case-insensitive)
+	for k := range diffs {
+		if strings.EqualFold(difficulty, k) {
 			return true
 		}
 	}
@@ -147,7 +232,8 @@ func InsertUser(username, difficulty string) (int64, error) {
 	}
 
 	if !ValidateDifficulty(difficulty) {
-		return 0, fmt.Errorf("invalid difficulty: %s (valid: %v)", difficulty, validDifficulties)
+		validDiffs := getDynamicDifficulties()
+		return 0, fmt.Errorf("invalid difficulty: %s (valid: %v)", difficulty, validDiffs)
 	}
 
 	// Check if username exists
@@ -377,18 +463,20 @@ func buildOrderByClause(config SortConfig) string {
 	case strings.Contains(config.Column, "difficulty"):
 		if config.Order == "desc" {
 			return `CASE difficulty 
-				WHEN 'hard' THEN 1 
-				WHEN 'intermediate' THEN 2 
-				WHEN 'basic' THEN 3 
-				WHEN 'fun' THEN 4 
-				ELSE 5 END ASC, rule_reached DESC, time_spent ASC`
+				WHEN 'expert' THEN 1 
+				WHEN 'hard' THEN 2 
+				WHEN 'intermediate' THEN 3 
+				WHEN 'basic' THEN 4 
+				WHEN 'fun' THEN 5 
+				ELSE 6 END ASC, rule_reached DESC, time_spent ASC`
 		}
 		return `CASE difficulty 
 			WHEN 'basic' THEN 1 
 			WHEN 'intermediate' THEN 2 
 			WHEN 'hard' THEN 3 
-			WHEN 'fun' THEN 4 
-			ELSE 5 END ASC, rule_reached DESC, time_spent ASC`
+			WHEN 'expert' THEN 4 
+			WHEN 'fun' THEN 5 
+			ELSE 6 END ASC, rule_reached DESC, time_spent ASC`
 
 	case strings.Contains(config.Column, "created_at"):
 		return fmt.Sprintf("created_at %s, rule_reached DESC, time_spent ASC", strings.ToUpper(config.Order))
@@ -516,8 +604,9 @@ func getUsersByDifficulty() (map[string]int, error) {
 				WHEN 'basic' THEN 1 
 				WHEN 'intermediate' THEN 2 
 				WHEN 'hard' THEN 3 
-				WHEN 'fun' THEN 4 
-				ELSE 5 
+				WHEN 'expert' THEN 4 
+				WHEN 'fun' THEN 5 
+				ELSE 6 
 			END
 	`
 

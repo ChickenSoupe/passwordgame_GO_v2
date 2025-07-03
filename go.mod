@@ -21,3 +21,8 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+require (
+	github.com/ahmed-debbech/go_chess_puzzle v1.0.0 // indirect
+	github.com/notnil/chess v1.10.0 // indirect
+)

@@ -3,6 +3,8 @@ package rules
 import (
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 )
 
@@ -20,20 +22,35 @@ type Rule struct {
 	Category       string            `json:"category"`
 }
 
+// Cache for the rule pool
+var (
+	rulePool   []Rule
+	poolMutex  sync.RWMutex
+	poolLoaded bool
+)
+
 // Pool returns all available rules with unique IDs
 func Pool() []Rule {
-	return []Rule{
-		// Basic Rules (1-10)
+	poolMutex.Lock()
+	defer poolMutex.Unlock()
+
+	if poolLoaded {
+		return rulePool
+	}
+
+	rulePool = []Rule{
+		// Rule 1: Must be at least 8 characters long
 		{
 			ID:          1,
-			Description: "Your password must be at least 8 characters long.",
+			Description: "Must be at least 8 characters long",
 			Validator:   func(t string) bool { return len(t) >= 8 },
 			Hint:        "Add more characters to reach at least 8.",
 			Category:    "basic",
 		},
+		// Rule 2: Must include both uppercase and lowercase letters
 		{
 			ID:          2,
-			Description: "Your password must include an uppercase and a lowercase letter.",
+			Description: "Must include both uppercase and lowercase letters",
 			Validator: func(t string) bool {
 				hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(t)
 				hasLower := regexp.MustCompile(`[a-z]`).MatchString(t)
@@ -42,97 +59,90 @@ func Pool() []Rule {
 			Hint:     "Include both UPPERCASE and lowercase letters.",
 			Category: "basic",
 		},
+		// Rule 3: Must include a special character (!@#$%^&*)
 		{
 			ID:          3,
-			Description: "Your password must include a special character (!@#$%^&*).",
+			Description: "Must include a special character (!@#$%^&*)",
 			Validator: func(t string) bool {
-				return regexp.MustCompile(`[!@#$%^&*]`).MatchString(t)
+				return regexp.MustCompile(`[!@#$%^&*\\]`).MatchString(t)
 			},
-			Hint:     "Add one of these: !@#$%^&*",
+			Hint:     "Add one of these: !@#$%^&*\\",
 			Category: "basic",
 		},
+		// Rule 4: Must include a number
 		{
 			ID:          4,
-			Description: "Your password must include a number.",
+			Description: "Must include a number",
 			Validator: func(t string) bool {
 				return regexp.MustCompile(`\d`).MatchString(t)
 			},
 			Hint:     "Add at least one digit (0-9).",
 			Category: "basic",
 		},
+		// Rule 5: Must include Roman numerals (I, V, X, L, C, D, M)
 		{
 			ID:          5,
-			Description: "Your password must not contain common words (password, admin, user).",
+			Description: "Must include Roman numerals (I, V, X, L, C, D, M)",
 			Validator: func(t string) bool {
-				lowerT := strings.ToLower(t)
-				commonWords := []string{"password", "admin", "user", "login", "welcome"}
-				for _, word := range commonWords {
-					if strings.Contains(lowerT, word) {
-						return false
+				romanNumerals := "IVXLCDM"
+				for _, char := range t {
+					if strings.ContainsRune(romanNumerals, char) {
+						return true
 					}
 				}
-				return true
+				return false
 			},
-			Hint:     "Avoid common words like: password, admin, user, login, welcome.",
+			Hint:     "Include Roman numerals: I, V, X, L, C, D, M",
 			Category: "basic",
 		},
-
-		// Intermediate Rules (11-20)
+		// Rule 6: Must include a prime number
 		{
-			ID:          11,
-			Description: "Your password must be at least 12 characters long.",
-			Validator:   func(t string) bool { return len(t) >= 12 },
-			Hint:        "Add more characters to reach at least 12.",
-			Category:    "intermediate",
-		},
-		{
-			ID:          12,
-			Description: "Your password must include at least 2 numbers.",
+			ID:          6,
+			Description: "Must include a prime number",
 			Validator: func(t string) bool {
-				count := 0
-				for _, char := range t {
-					if unicode.IsDigit(char) {
-						count++
+				primes := []string{"2", "3", "5", "7", "11", "13", "17", "19", "23", "29", "31", "37", "41", "43", "47"}
+				for _, prime := range primes {
+					if strings.Contains(t, prime) {
+						return true
 					}
 				}
-				return count >= 2
+				return false
 			},
-			Hint:     "Add at least 2 digits (0-9).",
+			Hint:     "Include a prime number: 2, 3, 5, 7, 11, 13, etc.",
+			Category: "basic",
+		},
+		// Rule 7: Must contain the current day of the week
+		{
+			ID:          7,
+			Description: "Must contain the current day of the week",
+			Validator: func(t string) bool {
+				currentDay := strings.ToLower(time.Now().Weekday().String())
+				return strings.Contains(strings.ToLower(t), currentDay)
+			},
+			Hint:     "Include today's day of the week: " + time.Now().Weekday().String(),
 			Category: "intermediate",
 		},
+		// Rule 8: Must contain one of our following sponsors: (Pepsi, Starbucks, Shell)
 		{
-			ID:          13,
-			Description: "Your password must include at least 2 special characters.",
+			ID:          8,
+			Description: "Must contain one of our following sponsors: (Pepsi, Starbucks, Shell)",
 			Validator: func(t string) bool {
-				count := 0
-				specialChars := "!@#$%^&*"
-				for _, char := range t {
-					if strings.ContainsRune(specialChars, char) {
-						count++
+				lowerT := strings.ToLower(t)
+				sponsors := []string{"pepsi", "starbucks", "shell"}
+				for _, sponsor := range sponsors {
+					if strings.Contains(lowerT, sponsor) {
+						return true
 					}
 				}
-				return count >= 2
+				return false
 			},
-			Hint:     "Add at least 2 special characters: !@#$%^&*",
+			Hint:     "Include one of our sponsors: Pepsi, Starbucks, Shell",
 			Category: "intermediate",
 		},
+		// Rule 9: Must contain at least one vowel
 		{
-			ID:          14,
-			Description: "Your password must not contain repeated characters (e.g., 'aa', '11').",
-			Validator: func(t string) bool {
-				for i := 0; i < len(t)-1; i++ {
-					if t[i] == t[i+1] {
-						return false
-					}
-				}
-				return true
-			},
-			Hint:     "Remove any repeated consecutive characters.",
-			Category: "intermediate",
-		},
-		{
-			ID:          15,
-			Description: "Your password must contain at least one vowel (a, e, i, o, u).",
+			ID:          9,
+			Description: "Must contain at least one vowel",
 			Validator: func(t string) bool {
 				vowels := "aeiouAEIOU"
 				for _, char := range t {
@@ -145,18 +155,29 @@ func Pool() []Rule {
 			Hint:     "Add at least one vowel: a, e, i, o, u",
 			Category: "intermediate",
 		},
-
-		// Hard Rules (21-30)
+		// Rule 10: Must include the current month name
 		{
-			ID:          21,
-			Description: "Your password must be at least 16 characters long.",
+			ID:          10,
+			Description: "Must include the current month name",
+			Validator: func(t string) bool {
+				currentMonth := strings.ToLower(time.Now().Month().String())
+				return strings.Contains(strings.ToLower(t), currentMonth)
+			},
+			Hint:     "Include the current month: " + time.Now().Month().String(),
+			Category: "intermediate",
+		},
+		// Rule 11: Must be at least 16 characters long
+		{
+			ID:          11,
+			Description: "Must be at least 16 characters long",
 			Validator:   func(t string) bool { return len(t) >= 16 },
 			Hint:        "Add more characters to reach at least 16.",
-			Category:    "hard",
+			Category:    "intermediate",
 		},
+		// Rule 12: Must include at least 3 uppercase letters
 		{
-			ID:          22,
-			Description: "Your password must include at least 3 uppercase letters.",
+			ID:          12,
+			Description: "Must include at least 3 uppercase letters",
 			Validator: func(t string) bool {
 				count := 0
 				for _, char := range t {
@@ -167,169 +188,83 @@ func Pool() []Rule {
 				return count >= 3
 			},
 			Hint:     "Add at least 3 UPPERCASE letters.",
-			Category: "hard",
+			Category: "intermediate",
 		},
+		// Rule 13: Must include the first 3 numbers of a mathematical constant: random
 		{
-			ID:          23,
-			Description: "Your password must include at least 3 numbers.",
+			ID:          13,
+			Description: "Must include the first 3 numbers of the following mathematical constant: random",
 			Validator: func(t string) bool {
-				count := 0
-				for _, char := range t {
-					if unicode.IsDigit(char) {
-						count++
-					}
-				}
-				return count >= 3
+				// Placeholder - always returns false for now
+				// This would need to be implemented with actual mathematical constants
+				return strings.Contains(t, "314") || strings.Contains(t, "271") || strings.Contains(t, "141") || strings.Contains(t, "577")
 			},
-			Hint:     "Add at least 3 digits (0-9).",
+			Hint:     "Include the first 3 digits of a mathematical constant (e.g., 314 for π, 271 for e)",
 			Category: "hard",
 		},
+		// Rule 14: Must include a captcha (5-digit code)
 		{
-			ID:          24,
-			Description: "Your password must not contain any dictionary words.",
-			Validator: func(t string) bool {
-				lowerT := strings.ToLower(t)
-				dictWords := []string{"password", "admin", "user", "login", "welcome", "hello", "world", "computer", "internet", "security", "system", "access", "account", "email", "phone", "address", "name", "birthday", "date", "time", "year", "month", "day"}
-				for _, word := range dictWords {
-					if strings.Contains(lowerT, word) {
-						return false
-					}
-				}
-				return true
-			},
-			Hint:     "Avoid common dictionary words.",
-			Category: "hard",
-		},
-		{
-			ID:          25,
-			Description: "Your password must contain at least one character from each: uppercase, lowercase, number, special character.",
-			Validator: func(t string) bool {
-				hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(t)
-				hasLower := regexp.MustCompile(`[a-z]`).MatchString(t)
-				hasDigit := regexp.MustCompile(`\d`).MatchString(t)
-				hasSpecial := regexp.MustCompile(`[!@#$%^&*]`).MatchString(t)
-				return hasUpper && hasLower && hasDigit && hasSpecial
-			},
-			Hint:     "Include at least one: UPPERCASE, lowercase, digit, special character.",
-			Category: "hard",
-		},
-
-		// Fun/Creative Rules (31-40)
-		{
-			ID:          31,
-			Description: "Your password must include this captcha:",
+			ID:          14,
+			Description: "Must include a captcha (5-digit code)",
 			Validator:   ValidateCaptcha,
 			Hint:        "Enter the 5-digit code shown in the captcha image.",
 			HasCaptcha:  true,
-			Category:    "fun",
+			Category:    "hard",
 		},
+		// Rule 15: Must include today's Wordle answer
 		{
-			ID:          32,
-			Description: "Your password must include today's Wordle answer. 🎯",
+			ID:          15,
+			Description: "Must include today's Wordle answer",
 			Validator:   ValidateWordleAnswer,
 			Hint:        "Include today's Wordle solution: " + GetTodaysAnswerForHint(),
-			Category:    "fun",
+			Category:    "hard",
 		},
+		// Rule 16: Must include the number in this QR code (placeholder)
 		{
-			ID:          33,
-			Description: "Your password must include the name of a month.",
+			ID:          16,
+			Description: "Must include the number in this QR code",
 			Validator: func(t string) bool {
-				lowerT := strings.ToLower(t)
-				months := []string{"january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"}
-				for _, month := range months {
-					if strings.Contains(lowerT, month) {
-						return true
-					}
-				}
+				// Placeholder validator - always returns false for now
 				return false
 			},
-			Hint:     "Include a month name (january, february, etc.).",
-			Category: "fun",
+			Hint:     "Scan the QR code to get the required number.",
+			Category: "hard",
 		},
+		// Rule 17: Must include a Hex code of the following color (placeholder)
 		{
-			ID:          34,
-			Description: "Your password must include a color name.",
+			ID:          17,
+			Description: "Must include a Hex code of the following color",
 			Validator: func(t string) bool {
-				lowerT := strings.ToLower(t)
-				colors := []string{"red", "blue", "green", "yellow", "orange", "purple", "pink", "black", "white", "brown", "gray", "grey"}
-				for _, color := range colors {
-					if strings.Contains(lowerT, color) {
-						return true
-					}
-				}
+				// Placeholder validator - always returns false for now
 				return false
 			},
-			Hint:     "Include a color name (red, blue, green, etc.).",
-			Category: "fun",
+			Hint:     "Include the hex color code for the displayed color.",
+			Category: "hard",
 		},
+		// Rule 18: Must include the best chess move
 		{
-			ID:          35,
-			Description: "Your password must include an animal name.",
-			Validator: func(t string) bool {
-				lowerT := strings.ToLower(t)
-				animals := []string{"cat", "dog", "bird", "fish", "lion", "tiger", "bear", "wolf", "fox", "rabbit", "mouse", "elephant", "giraffe", "zebra", "horse", "cow", "pig", "sheep", "goat", "chicken"}
-				for _, animal := range animals {
-					if strings.Contains(lowerT, animal) {
-						return true
-					}
-				}
-				return false
-			},
-			Hint:     "Include an animal name (cat, dog, lion, etc.).",
-			Category: "fun",
-		},
-		{
-			ID:          36,
-			Description: "Your password must include the digits of the current year (2024).",
-			Validator: func(t string) bool {
-				return strings.Contains(t, "2024")
-			},
-			Hint:     "Include the current year: 2024",
-			Category: "fun",
-		},
-		{
-			ID:          37,
-			Description: "Your password must include a mathematical operation (+, -, *, /).",
-			Validator: func(t string) bool {
-				mathOps := "+-*/"
-				for _, char := range t {
-					if strings.ContainsRune(mathOps, char) {
-						return true
-					}
-				}
-				return false
-			},
-			Hint:     "Include a math operator: +, -, *, /",
-			Category: "fun",
-		},
-
-		// Expert Rules (41-50)
-		{
-			ID:          41,
-			Description: "Your password must be at least 20 characters long.",
-			Validator:   func(t string) bool { return len(t) >= 20 },
-			Hint:        "Add more characters to reach at least 20.",
+			ID:          18,
+			Description: "Must include the best chess move (image)",
+			Validator:   ValidateChessMove,
+			Hint:        "Analyze the chess position and include the best move.",
+			HasCaptcha:  true, // Reuse captcha display logic for chess board
 			Category:    "expert",
 		},
+		// Rule 19: Your password is not strong enough 🏋️
 		{
-			ID:          42,
-			Description: "Your password must include at least 4 different special characters.",
+			ID:          19,
+			Description: "Your password is not strong enough 🏋️",
 			Validator: func(t string) bool {
-				specialChars := "!@#$%^&*"
-				found := make(map[rune]bool)
-				for _, char := range t {
-					if strings.ContainsRune(specialChars, char) {
-						found[char] = true
-					}
-				}
-				return len(found) >= 4
+				// This rule can never be satisfied - it's a trick rule
+				return false
 			},
-			Hint:     "Include at least 4 different special characters: !@#$%^&*",
+			Hint:     "This rule cannot be satisfied - it's designed to be impossible!",
 			Category: "expert",
 		},
+		// Rule 20: Must contain a palindrome (3+ characters)
 		{
-			ID:          43,
-			Description: "Your password must contain a palindrome (word that reads the same forwards and backwards).",
+			ID:          20,
+			Description: "Must contain a palindrome (3+ characters)",
 			Validator: func(t string) bool {
 				// Check for palindromes of length 3 or more
 				for i := 0; i < len(t); i++ {
@@ -345,37 +280,65 @@ func Pool() []Rule {
 			Hint:     "Include a palindrome like 'aba', 'racecar', or '121'.",
 			Category: "expert",
 		},
+		// Rule 21: Must include "pdf file" (placeholder)
 		{
-			ID:          44,
-			Description: "Your password must include Roman numerals (I, V, X, L, C, D, M).",
+			ID:          21,
+			Description: "Must include \"pdf file\" (link to malware, when just need the word pdf file)",
 			Validator: func(t string) bool {
-				romanNumerals := "IVXLCDM"
-				for _, char := range t {
-					if strings.ContainsRune(romanNumerals, char) {
-						return true
-					}
-				}
+				// Placeholder validator - always returns false for now
 				return false
 			},
-			Hint:     "Include Roman numerals: I, V, X, L, C, D, M",
+			Hint:     "This is a complex interactive rule - placeholder implementation.",
 			Category: "expert",
 		},
+		// Rule 22: Locks password textbox (placeholder)
 		{
-			ID:          45,
-			Description: "Your password must include a prime number (2, 3, 5, 7, 11, 13, etc.).",
+			ID:          22,
+			Description: "_Locks password textbox_ Oh no! Your password textbox is locked! Watch this raid shadows legend ad to unlock your textbox!",
 			Validator: func(t string) bool {
-				primes := []string{"2", "3", "5", "7", "11", "13", "17", "19", "23", "29", "31", "37", "41", "43", "47"}
-				for _, prime := range primes {
-					if strings.Contains(t, prime) {
-						return true
-					}
-				}
+				// Placeholder validator - always returns false for now
 				return false
 			},
-			Hint:     "Include a prime number: 2, 3, 5, 7, 11, 13, etc.",
+			Hint:     "This is a complex interactive rule - placeholder implementation.",
+			Category: "expert",
+		},
+		// Rule 23: Ransomware attack warning (placeholder)
+		{
+			ID:          23,
+			Description: "!!Warning!! a ransomware attack is trying to get your password, delete the blackbox to defend it!",
+			Validator: func(t string) bool {
+				// Placeholder validator - always returns false for now
+				return false
+			},
+			Hint:     "This is a complex interactive rule - placeholder implementation.",
+			Category: "expert",
+		},
+		// Rule 24: Insider threat detection (placeholder)
+		{
+			ID:          24,
+			Description: "It seems like someone here leaked your information, find the insider threat in your password!",
+			Validator: func(t string) bool {
+				// Placeholder validator - always returns false for now
+				return false
+			},
+			Hint:     "This is a complex interactive rule - placeholder implementation.",
+			Category: "expert",
+		},
+		// Rule 25: Update alert box (placeholder)
+		{
+			ID:          25,
+			Description: "A new password rule just got updated! Please click update on the alertbox!",
+			Validator: func(t string) bool {
+				// Placeholder validator - always returns false for now
+				return false
+			},
+			Hint:     "This is a complex interactive rule - placeholder implementation.",
 			Category: "expert",
 		},
 	}
+
+	poolLoaded = true
+	return rulePool
 }
 
 // Helper function to check if a string is a palindrome
