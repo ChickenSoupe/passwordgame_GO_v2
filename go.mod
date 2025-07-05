@@ -22,7 +22,6 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-require (
-	github.com/ahmed-debbech/go_chess_puzzle v1.0.0 // indirect
-	github.com/notnil/chess v1.10.0 // indirect
-)
+require github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
+
+require github.com/corentings/chess/v2 v2.0.9

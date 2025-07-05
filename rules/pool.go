@@ -246,7 +246,13 @@ func Pool() []Rule {
 			ID:          18,
 			Description: "Must include the best chess move (image)",
 			Validator:   ValidateChessMove,
-			Hint:        "Analyze the chess position and include the best move.",
+			Hint:        func() string { 
+				_, bestMove := GetCurrentChessPosition()
+				if bestMove == "" {
+					return "Analyzing chess position..."
+				}
+				return "Best move: " + bestMove 
+			}(),
 			HasCaptcha:  true, // Reuse captcha display logic for chess board
 			Category:    "expert",
 		},

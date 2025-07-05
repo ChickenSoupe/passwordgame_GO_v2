@@ -229,6 +229,13 @@
 
         // Chess refresh function
         function refreshChess(ruleId) {
+            const refreshBtn = document.querySelector(`button[onclick="refreshChess(${ruleId})"]`);
+            const originalHtml = refreshBtn.innerHTML;
+            
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<span class="loading-spinner"></span>';
+            
             fetch('/refresh-chess', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
@@ -239,15 +246,37 @@
                             chessImg.src = '/chess.png?' + new Date().getTime();
                         }
                         
+                        // Update the hint with the new best move
+                        const ruleElement = document.querySelector(`[data-rule-id="${ruleId}"]`);
+                        if (ruleElement) {
+                            const hintElement = ruleElement.querySelector('.rule-hint');
+                            if (hintElement) {
+                                hintElement.textContent = `Best move: ${data.bestMove || 'Analyzing...'}`;
+                            }
+                        }
+                        
                         // Re-validate password after chess refresh
                         const passwordInput = document.querySelector('.password-input');
                         if (passwordInput && passwordInput.value) {
-                            htmx.trigger(passwordInput, 'htmx:trigger');
+                            htmx.trigger(passwordInput, 'input');
                         }
                     }
                 })
                 .catch(error => {
                     console.error('Error refreshing chess:', error);
+                    // Show error in hint
+                    const ruleElement = document.querySelector(`[data-rule-id="${ruleId}"]`);
+                    if (ruleElement) {
+                        const hintElement = ruleElement.querySelector('.rule-hint');
+                        if (hintElement) {
+                            hintElement.textContent = 'Error refreshing chess position. Try again.';
+                        }
+                    }
+                })
+                .finally(() => {
+                    // Restore button state
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = originalHtml;
                 });
         }
     </script>
