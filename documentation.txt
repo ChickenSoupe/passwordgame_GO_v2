@@ -1,0 +1,66 @@
+File structure:
+
+project-root/
+|--- main.go
+|--- go.mod
+|--- component/
+|    |--- leaderboard.go
+|    |--- display.go
+|    |--- config.go
+|--- rules/
+|    |--- assignments.json
+|    |--- captcha.go
+|    |--- chess.go
+|    |--- pool.go
+|    |--- validate.go
+|    |--- wordle.go
+|--- Frontend/
+|    |--- style.css
+|    |--- display.html
+|    |--- admin.html
+|    |--- flip-animations.js
+|    |--- user-modal.html
+|--- Database/
+|    |--- user.db
+|    |--- user.go
+
+Bugs:
+Sidebar is not within the width
+
+
+ID: 1 - Must be at least 8 characters long
+ID: 2 - Must include both uppercase and lowercase letters
+ID: 3 - Must include a special character (!@#$%^&*)
+ID: 4 - Must include a number
+ID: 5 - Must include Roman numerals (I, V, X, L, C, D, M)
+ID: 6 - Must include a prime number
+
+ID: 7 - Must contain the current day of the week
+ID: 8 - Must contain one of our following sponsors: (Pepsi, Starbucks, Shell)
+ID: 9 - Must contain at least one vowel
+ID: 10 - Must include the current month name
+
+ID: 11 - Must be at least 16 characters long
+ID: 12 - Must include at least 3 uppercase letters
+ID: 13 - Must include the first 3 number the following mathmatical constant: random
+
+ID: 14 - Must include a captcha (5-digit code)
+ID: 15 - Must include today's Wordle answer
+ID: 16 - Must include the number in this qrcode
+ID: 17 - Must include a Hex code of the following color
+ID: 18 - Must include the best chess move (image)
+
+ID: 19 - Your password is not strong enough 🏋️
+ID: 20 - Must contain a palindrome (3+ characters)
+
+ID: 21 - Must include "pdf file" (link to malware, when just need the word pdf file)
+ID: 22 - *Locks password textbox* Oh no! Your password textbox is locked! 
+watch this raid shadows legend ad to unlock your textbox!
+ID: 23 - !!Warning!! a ransomware attack is trying to get your password, delete 
+the blackbox to defend it!
+ID: 24 - It seems like someone here leaked your information, find the insider threat in 
+your password!
+ID: 25 - A new password rule just got updated! Please click update on the alertbox!
+
+
+At the end save your password to a password manager :)

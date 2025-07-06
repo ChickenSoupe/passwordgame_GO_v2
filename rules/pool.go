@@ -219,16 +219,14 @@ func Pool() []Rule {
 			Hint:        "Include today's Wordle solution: " + GetTodaysAnswerForHint(),
 			Category:    "hard",
 		},
-		// Rule 16: Must include the number in this QR code (placeholder)
+		// Rule 16: Must include the word in this QR code
 		{
 			ID:          16,
-			Description: "Must include the number in this QR code",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "Scan the QR code to get the required number.",
-			Category: "hard",
+			Description: "Must include the word in this QR code",
+			Validator:   ValidateQRCodeWord,
+			HasCaptcha:  true,
+			Hint:        "Scan the QR code to get the required word.",
+			Category:    "hard",
 		},
 		// Rule 17: Must include a Hex code of the following color (placeholder)
 		{
@@ -246,15 +244,15 @@ func Pool() []Rule {
 			ID:          18,
 			Description: "Must include the best chess move (image)",
 			Validator:   ValidateChessMove,
-			Hint:        func() string { 
+			Hint: func() string {
 				_, bestMove := GetCurrentChessPosition()
 				if bestMove == "" {
 					return "Analyzing chess position..."
 				}
-				return "Best move: " + bestMove 
+				return "Best move: " + bestMove
 			}(),
-			HasCaptcha:  true, // Reuse captcha display logic for chess board
-			Category:    "expert",
+			HasCaptcha: true, // Reuse captcha display logic for chess board
+			Category:   "expert",
 		},
 		// Rule 19: Your password is not strong enough 🏋️
 		{

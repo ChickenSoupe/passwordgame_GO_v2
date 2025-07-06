@@ -20,6 +20,23 @@ func main() {
 	}
 	defer database.CloseDB()
 
+	// Initialize QR code table
+	err = rules.InitQRCodeTable()
+	if err != nil {
+		log.Fatalf("Failed to initialize QR code table: %v", err)
+	}
+
+	// Generate initial QR code with random string
+	err = rules.RefreshQRCodeWithRandom()
+	if err != nil {
+		log.Printf("Warning: Failed to generate initial QR code with random string: %v", err)
+		// Fall back to regular refresh if random fails
+		err = rules.RefreshQRCode()
+		if err != nil {
+			log.Printf("Warning: Failed to generate initial QR code: %v", err)
+		}
+	}
+
 	// Create Database directory if it doesn't exist
 	if err := os.MkdirAll("Database", 0755); err != nil {
 		log.Printf("Warning: Could not create Database directory: %v", err)
@@ -40,6 +57,10 @@ func main() {
 	// Chess routes
 	http.HandleFunc("/chess.png", rules.ServeChessImage)
 	http.HandleFunc("/refresh-chess", rules.RefreshChess)
+
+	// QR code routes
+	http.HandleFunc("/qrcode.png", rules.ServeQRCodeImage)
+	http.HandleFunc("/refresh-qrcode", rules.RefreshQRCodeHandler)
 
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {

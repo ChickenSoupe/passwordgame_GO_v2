@@ -279,6 +279,50 @@
                     refreshBtn.innerHTML = originalHtml;
                 });
         }
+
+        // QR Code refresh function
+        function refreshQRCode(ruleId) {
+            const refreshBtn = document.querySelector(`button[onclick="refreshQRCode(${ruleId})"]`);
+            const originalHtml = refreshBtn.innerHTML;
+            
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<span class="loading-spinner"></span>';
+            
+            fetch('/refresh-qrcode', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Add timestamp to force image reload
+                        const qrCodeImg = document.getElementById('qrcode-' + ruleId);
+                        if (qrCodeImg) {
+                            qrCodeImg.src = '/qrcode.png?' + new Date().getTime();
+                        }
+                        
+                        // Re-validate password after QR code refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            htmx.trigger(passwordInput, 'input');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing QR code:', error);
+                    // Show error in hint
+                    const ruleElement = document.querySelector(`[data-rule-id="${ruleId}"]`);
+                    if (ruleElement) {
+                        const hintElement = ruleElement.querySelector('.rule-hint');
+                        if (hintElement) {
+                            hintElement.textContent = 'Error refreshing QR code. Try again.';
+                        }
+                    }
+                })
+                .finally(() => {
+                    // Restore button state
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = originalHtml;
+                });
+        }
     </script>
 </body>
 </html>

@@ -14,6 +14,11 @@ import (
 
 var db *sql.DB
 
+// GetDB returns the database connection
+func GetDB() *sql.DB {
+	return db
+}
+
 // DifficultyConfig represents the configuration for a difficulty level
 type DifficultyConfig struct {
 	Name        string `json:"name"`
@@ -108,7 +113,7 @@ func getDynamicDifficulties() []string {
 		// Fallback to default difficulties if config loading fails
 		return []string{"basic", "intermediate", "hard", "expert", "fun"}
 	}
-	
+
 	var validDiffs []string
 	for key := range difficulties {
 		validDiffs = append(validDiffs, key)

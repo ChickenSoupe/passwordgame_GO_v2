@@ -1,3 +1,13 @@
 {
-    "codium.codeCompletion.enable": false
+    "codium.codeCompletion.enable": false,
+    "zencoder.mcpServers": {
+        "Context7": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@upstash/context7-mcp@latest"
+            ]
+        }
+    },
+    "zencoder.enableRepoIndexing": true
 }
