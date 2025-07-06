@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image/png"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
@@ -29,6 +31,62 @@ var (
 type QRWord struct {
 	ID   int64
 	Word string
+}
+
+// FetchRandomWord fetches a random word from the random-word-api.herokuapp.com API
+func FetchRandomWord() (string, error) {
+	// API endpoint for fetching a random word
+	apiURL := "https://random-word-api.herokuapp.com/word"
+
+	// Create a client with a timeout to prevent hanging
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	// Make the request
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch random word from API: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API returned non-OK status: %d", resp.StatusCode)
+	}
+
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read API response: %v", err)
+	}
+
+	// Parse the JSON response (the API returns an array of words)
+	var words []string
+	if err := json.Unmarshal(body, &words); err != nil {
+		return "", fmt.Errorf("failed to parse API response: %v", err)
+	}
+
+	// Check if we got any words
+	if len(words) == 0 {
+		return "", fmt.Errorf("API returned empty word list")
+	}
+
+	// Return the first word (the API typically returns just one word)
+	return words[0], nil
+}
+
+// GetFallbackWords returns a list of fallback words in case the API is unavailable
+func GetFallbackWords() []string {
+	return []string{
+		"password", "security", "encryption", "authentication", "verification",
+		"protection", "firewall", "cybersecurity", "privacy", "confidential",
+		"secret", "hidden", "secure", "private", "locked", "key", "code",
+		"apple", "banana", "orange", "computer", "keyboard", "mouse", "monitor",
+		"tiger", "lion", "elephant", "dolphin", "eagle", "penguin", "turtle",
+		"happy", "amazing", "awesome", "fantastic", "brilliant", "beautiful",
+		"mountain", "ocean", "beach", "forest", "jungle", "desert", "island",
+	}
 }
 
 // InitQRCodeTable initializes the QR code words table in the database
@@ -58,24 +116,19 @@ func InitQRCodeTable() error {
 		return fmt.Errorf("failed to check qr_words count: %v", err)
 	}
 
-	// If the table is empty, populate it with some default words
+	// If the table is empty, populate it with fallback words
 	if count == 0 {
-		defaultWords := []string{
-			"password", "security", "encryption", "authentication", "verification",
-			"protection", "firewall", "cybersecurity", "privacy", "confidential",
-			"secret", "hidden", "secure", "private", "locked",
-			"key", "code", "cipher", "cryptic", "enigma",
-		}
+		fallbackWords := GetFallbackWords()
 
 		insertSQL := "INSERT INTO qr_words (word) VALUES (?)"
-		for _, word := range defaultWords {
+		for _, word := range fallbackWords {
 			_, err := db.Exec(insertSQL, word)
 			if err != nil {
 				log.Printf("Warning: failed to insert QR word '%s': %v", word, err)
 				// Continue with other words even if one fails
 			}
 		}
-		log.Println("✅ QR code words table populated with default words")
+		log.Println("✅ QR code words table populated with fallback words")
 	}
 
 	return nil
@@ -177,10 +230,10 @@ func ServeQRCodeImage(w http.ResponseWriter, r *http.Request) {
 	qrMutex.RUnlock()
 
 	if qrImageB64 == "" {
-		// Generate new QR code with random string if none exists
-		err := RefreshQRCodeWithRandom()
+		// Generate new QR code with a word from the API if none exists
+		err := RefreshQRCodeWithAPI()
 		if err != nil {
-			// Fall back to regular refresh if random fails
+			// Fall back to regular refresh if API word generation fails
 			err = RefreshQRCode()
 			if err != nil {
 				http.Error(w, "Failed to generate QR code", http.StatusInternalServerError)
@@ -210,10 +263,10 @@ func ServeQRCodeImage(w http.ResponseWriter, r *http.Request) {
 
 // RefreshQRCodeHandler generates a new QR code and returns success status
 func RefreshQRCodeHandler(w http.ResponseWriter, r *http.Request) {
-	// Use the random string generator for refreshing
-	err := RefreshQRCodeWithRandom()
+	// Use the API word generator for refreshing
+	err := RefreshQRCodeWithAPI()
 	if err != nil {
-		// Fall back to regular refresh if random fails
+		// Fall back to regular refresh if API word generation fails
 		err = RefreshQRCode()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to refresh QR code: %v", err), http.StatusInternalServerError)
@@ -251,19 +304,25 @@ func GenerateRandomString(length int) string {
 	return string(b)
 }
 
-// AddRandomQRWord adds a new random word to the database
-func AddRandomQRWord() (string, error) {
+// AddRandomWordFromAPI adds a new random word from the API to the database
+func AddRandomWordFromAPI() (string, error) {
 	db := database.GetDB()
 	if db == nil {
 		return "", fmt.Errorf("database connection not available")
 	}
 
-	// Generate a random string between 5-8 characters
-	randomWord := GenerateRandomString(rand.Intn(4) + 5)
+	// Fetch a random word from the API
+	randomWord, err := FetchRandomWord()
+	if err != nil {
+		// If API fails, fall back to a random word from our fallback list
+		log.Printf("Warning: Failed to fetch word from API: %v. Using fallback.", err)
+		fallbackWords := GetFallbackWords()
+		randomWord = fallbackWords[rand.Intn(len(fallbackWords))]
+	}
 
-	// Insert the random word into the database
+	// Insert the word into the database if it doesn't exist
 	insertSQL := "INSERT INTO qr_words (word) VALUES (?) ON CONFLICT(word) DO NOTHING"
-	_, err := db.Exec(insertSQL, randomWord)
+	_, err = db.Exec(insertSQL, randomWord)
 	if err != nil {
 		return "", fmt.Errorf("failed to insert random QR word: %v", err)
 	}
@@ -271,17 +330,17 @@ func AddRandomQRWord() (string, error) {
 	return randomWord, nil
 }
 
-// RefreshQRCodeWithRandom generates a new QR code with a random string
-func RefreshQRCodeWithRandom() error {
-	// Add a new random word to the database
-	randomWord, err := AddRandomQRWord()
+// RefreshQRCodeWithAPI generates a new QR code with a word from the API
+func RefreshQRCodeWithAPI() error {
+	// Add a new word from the API to the database
+	apiWord, err := AddRandomWordFromAPI()
 	if err != nil {
-		// If adding a random word fails, fall back to existing words
+		// If adding an API word fails, fall back to existing words
 		return RefreshQRCode()
 	}
 
-	// Generate QR code for the random word
-	qrImageB64, err := GenerateQRCode(randomWord)
+	// Generate QR code for the API word
+	qrImageB64, err := GenerateQRCode(apiWord)
 	if err != nil {
 		return fmt.Errorf("failed to generate QR code: %v", err)
 	}
@@ -289,7 +348,7 @@ func RefreshQRCodeWithRandom() error {
 	qrMutex.Lock()
 	defer qrMutex.Unlock()
 
-	currentQRWord = randomWord
+	currentQRWord = apiWord
 	currentQRImageB64 = qrImageB64
 
 	return nil
@@ -311,10 +370,10 @@ func init() {
 
 		// Refresh the QR code every 10 minutes
 		for {
-			// Try to refresh with a random string first
-			err := RefreshQRCodeWithRandom()
+			// Try to refresh with a word from the API first
+			err := RefreshQRCodeWithAPI()
 			if err != nil {
-				// Fall back to regular refresh if random fails
+				// Fall back to regular refresh if API word generation fails
 				_ = RefreshQRCode()
 			}
 

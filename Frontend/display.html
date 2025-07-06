@@ -323,6 +323,68 @@
                     refreshBtn.innerHTML = originalHtml;
                 });
         }
+
+        // Color refresh function
+        function refreshColor(ruleId) {
+            const refreshBtn = document.querySelector(`button[onclick="refreshColor(${ruleId})"]`);
+            const originalHtml = refreshBtn.innerHTML;
+            
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<span class="loading-spinner"></span>';
+            
+            fetch('/refresh-color', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Add timestamp to force image reload
+                        const colorImg = document.getElementById('color-' + ruleId);
+                        if (colorImg) {
+                            colorImg.src = '/color.png?' + new Date().getTime();
+                        }
+                        
+                        // Re-validate password after color refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            htmx.trigger(passwordInput, 'input');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing color:', error);
+                    // Show error in hint
+                    const ruleElement = document.querySelector(`[data-rule-id="${ruleId}"]`);
+                    if (ruleElement) {
+                        const hintElement = ruleElement.querySelector('.rule-hint');
+                        if (hintElement) {
+                            hintElement.textContent = 'Error refreshing color. Try again.';
+                        }
+                    }
+                })
+                .finally(() => {
+                    // Restore button state
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = originalHtml;
+                });
+        }
+
+        // Math constant refresh function
+        function refreshConstant(ruleId) {
+            fetch('/refresh-constant', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Re-validate password after constant refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            htmx.trigger(passwordInput, 'input');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing mathematical constant:', error);
+                });
+        }
     </script>
 </body>
 </html>

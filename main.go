@@ -2,10 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	database "passgame/Database"
 	"passgame/component"
@@ -26,15 +32,39 @@ func main() {
 		log.Fatalf("Failed to initialize QR code table: %v", err)
 	}
 
-	// Generate initial QR code with random string
-	err = rules.RefreshQRCodeWithRandom()
+	// Initialize mathematical constants table
+	err = rules.InitConstantsTable()
 	if err != nil {
-		log.Printf("Warning: Failed to generate initial QR code with random string: %v", err)
-		// Fall back to regular refresh if random fails
+		log.Fatalf("Failed to initialize mathematical constants table: %v", err)
+	}
+
+	// Initialize color codes table
+	err = rules.InitColorsTable()
+	if err != nil {
+		log.Fatalf("Failed to initialize color codes table: %v", err)
+	}
+
+	// Generate initial QR code with a word from the API
+	err = rules.RefreshQRCodeWithAPI()
+	if err != nil {
+		log.Printf("Warning: Failed to generate initial QR code with API word: %v", err)
+		// Fall back to regular refresh if API fails
 		err = rules.RefreshQRCode()
 		if err != nil {
 			log.Printf("Warning: Failed to generate initial QR code: %v", err)
 		}
+	}
+
+	// Generate initial mathematical constant
+	err = rules.RefreshMathConstant()
+	if err != nil {
+		log.Printf("Warning: Failed to generate initial mathematical constant: %v", err)
+	}
+
+	// Generate initial color
+	err = rules.RefreshColor()
+	if err != nil {
+		log.Printf("Warning: Failed to generate initial color: %v", err)
 	}
 
 	// Create Database directory if it doesn't exist
@@ -61,6 +91,13 @@ func main() {
 	// QR code routes
 	http.HandleFunc("/qrcode.png", rules.ServeQRCodeImage)
 	http.HandleFunc("/refresh-qrcode", rules.RefreshQRCodeHandler)
+
+	// Color routes
+	http.HandleFunc("/color.png", ServeColorImage)
+	http.HandleFunc("/refresh-color", RefreshColorHandler)
+
+	// Math constant routes
+	http.HandleFunc("/refresh-constant", RefreshConstantHandler)
 
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
@@ -136,4 +173,111 @@ func main() {
 	log.Println("🎮 Password Game: http://localhost:8080/display")
 	log.Println("🏆 Leaderboard: http://localhost:8080/leaderboard")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+// hexToRGB converts a hex color string to RGB values
+func hexToRGB(hexColor string) (r, g, b uint8, err error) {
+	// Remove the # prefix if present
+	hexColor = strings.TrimPrefix(hexColor, "#")
+
+	// Parse the hex color
+	if len(hexColor) != 6 {
+		return 0, 0, 0, fmt.Errorf("invalid hex color format: %s", hexColor)
+	}
+
+	// Parse the RGB values
+	rgb, err := strconv.ParseUint(hexColor, 16, 32)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid hex color: %s", hexColor)
+	}
+
+	// Extract the RGB components
+	r = uint8((rgb >> 16) & 0xFF)
+	g = uint8((rgb >> 8) & 0xFF)
+	b = uint8(rgb & 0xFF)
+
+	return r, g, b, nil
+}
+
+// ServeColorImage serves an image of the current color
+func ServeColorImage(w http.ResponseWriter, r *http.Request) {
+	// Get the current color
+	_, hexCode := rules.GetCurrentColor()
+
+	if hexCode == "" {
+		// Generate a new color if none exists
+		err := rules.RefreshColor()
+		if err != nil {
+			http.Error(w, "Failed to generate color", http.StatusInternalServerError)
+			return
+		}
+		_, hexCode = rules.GetCurrentColor()
+	}
+
+	// Convert hex to RGB
+	red, green, blue, err := hexToRGB(hexCode)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid color format: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create a new image
+	width, height := 200, 200
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// Fill the image with the color
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{red, green, blue, 255})
+		}
+	}
+
+	// Prevent caching to ensure fresh images
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
+	// Encode and serve the image
+	png.Encode(w, img)
+}
+
+// RefreshColorHandler generates a new random color
+func RefreshColorHandler(w http.ResponseWriter, r *http.Request) {
+	err := rules.RefreshColor()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to refresh color: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get the current color for the response
+	colorName, hexCode := rules.GetCurrentColor()
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"status":  "refreshed",
+		"name":    colorName,
+		"hexCode": hexCode,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// RefreshConstantHandler generates a new random mathematical constant
+func RefreshConstantHandler(w http.ResponseWriter, r *http.Request) {
+	err := rules.RefreshMathConstant()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to refresh mathematical constant: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get the current constant for the response
+	constantName, constantValue := rules.GetCurrentMathConstant()
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"status": "refreshed",
+		"name":   constantName,
+		"value":  constantValue,
+	}
+	json.NewEncoder(w).Encode(response)
 }

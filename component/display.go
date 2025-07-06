@@ -72,6 +72,11 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
             <img src="/qrcode.png" alt="QR Code" class="qrcode-image" id="qrcode-{{.ID}}">
             <button type="button" class="refresh-qrcode-btn" onclick="refreshQRCode({{.ID}})">🔄</button>
         </div>
+        {{else if eq .ID 17}}
+        <div class="color-container">
+            <img src="/color.png" alt="Color" class="color-image" id="color-{{.ID}}">
+            <button type="button" class="refresh-color-btn" onclick="refreshColor({{.ID}})">🔄</button>
+        </div>
         {{else if eq .ID 18}}
         <div class="chess-container">
             <img src="/chess.png" alt="Chess Board" class="chess-image" id="chess-{{.ID}}">

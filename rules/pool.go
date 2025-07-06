@@ -194,12 +194,10 @@ func Pool() []Rule {
 		{
 			ID:          13,
 			Description: "Must include the first 3 numbers of the following mathematical constant: random",
-			Validator: func(t string) bool {
-				// Placeholder - always returns false for now
-				// This would need to be implemented with actual mathematical constants
-				return strings.Contains(t, "314") || strings.Contains(t, "271") || strings.Contains(t, "141") || strings.Contains(t, "577")
-			},
-			Hint:     "Include the first 3 digits of a mathematical constant (e.g., 314 for π, 271 for e)",
+			Validator:   ValidateMathConstant,
+			Hint: func() string {
+				return "Include the first 3 digits of " + GetMathConstantForHint()
+			}(),
 			Category: "hard",
 		},
 		// Rule 14: Must include a captcha (5-digit code)
@@ -228,16 +226,16 @@ func Pool() []Rule {
 			Hint:        "Scan the QR code to get the required word.",
 			Category:    "hard",
 		},
-		// Rule 17: Must include a Hex code of the following color (placeholder)
+		// Rule 17: Must include a Hex code of the following color
 		{
 			ID:          17,
 			Description: "Must include a Hex code of the following color",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "Include the hex color code for the displayed color.",
-			Category: "hard",
+			Validator:   ValidateHexColor,
+			Hint: func() string {
+				return "Include the hex color code for " + GetColorForHint()
+			}(),
+			HasCaptcha: true, // We'll use the captcha display logic to show the color
+			Category:   "hard",
 		},
 		// Rule 18: Must include the best chess move
 		{
