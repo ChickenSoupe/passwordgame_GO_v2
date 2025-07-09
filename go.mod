@@ -6,6 +6,8 @@ go 1.24.3
 require (
 	github.com/dchest/captcha v1.1.0
 	modernc.org/sqlite v1.38.0
+	github.com/boombuler/barcode v1.0.2
+	github.com/corentings/chess/v2 v2.0.9
 )
 
 //indirect dependencies
@@ -20,14 +22,8 @@ require (
 	modernc.org/libc v1.65.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-)
-
-require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
-	github.com/boombuler/barcode v1.0.2
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 )
 
-require github.com/corentings/chess/v2 v2.0.9
 
-require github.com/IvanMenshykov/MoonPhase v0.0.0-20210411203237-6c61017953a8 // indirect
+

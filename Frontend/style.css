@@ -295,6 +295,42 @@ body {
     display: flex;
     align-items: center;
     gap: 15px;
+    position: relative;
+}
+
+.imposter-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    padding-left: 0.5em;
+    font-size: 16px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    z-index: 2;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.imposter-char {
+    color: #fff;
+    background: #d50000;
+    border: 2px solid #fff;
+    border-radius: 8px;
+    padding: 0 8px;
+    font-weight: bold;
+    font-size: 1.1em;
+    box-shadow: 0 0 8px #d50000, 0 0 2px #fff;
+    margin: 0 2px;
+    animation: imposter-pulse 1s infinite alternate;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+@keyframes imposter-pulse {
+    0% { background: #d50000; box-shadow: 0 0 8px #d50000, 0 0 2px #fff; }
+    100% { background: #ff1744; box-shadow: 0 0 16px #ff1744, 0 0 4px #fff; }
 }
 
 .password-input {
@@ -336,6 +372,11 @@ body {
     gap: 16px;
     position: relative;
     min-height: 100px;
+}
+
+/* FLIP animations */
+.flip-animate {
+    will-change: transform, opacity;
 }
 
 .rule-item {
@@ -755,6 +796,38 @@ body {
 
 .btn-primary:active {
     transform: translateY(0);
+}
+
+#watch-ad-btn {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+    min-width: 200px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    animation: pulse 1.5s infinite alternate;
+}
+
+#watch-ad-btn:hover {
+    background: #f57c00;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
+    animation: none;
+}
+
+#watch-ad-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
 }
 
 .loading-indicator {

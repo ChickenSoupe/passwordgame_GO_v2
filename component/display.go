@@ -55,7 +55,7 @@ type UserSession struct {
 }
 
 // Global session storage (in production, use Redis or similar)
-var userSessions = make(map[string]*UserSession)
+var UserSessions = make(map[string]*UserSession)
 
 const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
 <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}" data-rule-id="{{.ID}}">
@@ -66,7 +66,19 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
         <div class="captcha-container">
             <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
             <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
+            <button type="button" class="update-password-btn" onclick="showRule14Popup({{.ID}})">Update</button>
         </div>
+        <div id="rule14-popup-{{.ID}}" class="modal-overlay" style="display:none;z-index:10000;">
+            <div class="modal-container" style="text-align:center;">
+                <div class="modal-header">
+                    <h2>Update Password</h2>
+                    <p>Click the button below to reveal your password.</p>
+                </div>
+                <button type="button" class="btn" onclick="revealRule14Password({{.ID}})">Reveal Password</button>
+                <button type="button" class="btn btn-secondary" onclick="hideRule14Popup({{.ID}})">Cancel</button>
+            </div>
+        </div>
+        <div id="rule14-password-{{.ID}}" class="rule14-password" style="display:none;"></div>
         {{else if eq .ID 16}}
         <div class="qrcode-container">
             <img src="/qrcode.png" alt="QR Code" class="qrcode-image" id="qrcode-{{.ID}}">
@@ -83,6 +95,25 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
             <button type="button" class="refresh-chess-btn" onclick="refreshChess({{.ID}})">🔄</button>
         </div>
         {{end}}
+        {{end}}
+        {{if eq .ID 20}}
+        <div class="rule20-progress-container">
+            <div class="rule20-progress-bar-bg">
+                <div class="rule20-progress-bar" id="rule20-progress-bar-{{.ID}}" style="width:0%"></div>
+            </div>
+            <div class="rule20-progress-label" id="rule20-progress-label-{{.ID}}">0/3 🏋️</div>
+        </div>
+        {{end}}
+        {{if eq .ID 22}}
+        <div class="rule22-pdf-link">
+            <a href="#" id="rule22-pdf-link" style="color:blue;text-decoration:underline;cursor:pointer;">pdf file</a>
+        </div>
+        {{end}}
+        {{if eq .ID 23}}
+        <div class="watch-ad-container" id="watch-ad-container-{{.ID}}">
+            <button id="watch-ad-btn-23" class="btn-primary" onclick="return showAdModal();">Watch Ad to Unlock</button>
+        </div>
+        <div class="rule23-reveal" style="display: none;"></div>
         {{end}}
         {{if not .IsSatisfied}}
         <div class="rule-hint">{{.Hint}}</div>
@@ -163,7 +194,7 @@ func getUserSession(r *http.Request) *UserSession {
 		return nil
 	}
 
-	session, exists := userSessions[cookie.Value]
+	session, exists := UserSessions[cookie.Value]
 	if !exists {
 		return nil
 	}
@@ -223,7 +254,10 @@ func HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
 		MaxRule:    0,
 	}
 
-	userSessions[sessionID] = userSession
+	// Reset cybersecurity rules for the new session
+	rules.ResetCyberSecurityRules()
+
+	UserSessions[sessionID] = userSession
 
 	// Set session cookie
 	http.SetCookie(w, &http.Cookie{
@@ -259,7 +293,11 @@ func HandlePasswordGame(w http.ResponseWriter, r *http.Request) {
 
 		// Create a temporary session ID for the test session
 		sessionID := "test_" + fmt.Sprint(time.Now().UnixNano())
-		userSessions[sessionID] = testUser
+
+		// Reset cybersecurity rules for the test session
+		rules.ResetCyberSecurityRules()
+
+		UserSessions[sessionID] = testUser
 
 		// Set session cookie
 		http.SetCookie(w, &http.Cookie{

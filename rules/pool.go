@@ -200,35 +200,43 @@ func Pool() []Rule {
 			}(),
 			Category: "hard",
 		},
-		// Rule 14: Must include a captcha (5-digit code)
+		// Rule 14: Update alert box
 		{
 			ID:          14,
+			Description: "A new password rule just got updated! Please click update on the alertbox!",
+			Validator:   Rule14UpdateAlert,
+			Hint:        "After the update, include '" + GetUpdateString() + "' in your password.",
+			Category:    "expert",
+		},
+		// Rule 15: Must include a captcha (5-digit code)
+		{
+			ID:          15,
 			Description: "Must include a captcha (5-digit code)",
 			Validator:   ValidateCaptcha,
 			Hint:        "Enter the 5-digit code shown in the captcha image.",
 			HasCaptcha:  true,
 			Category:    "hard",
 		},
-		// Rule 15: Must include today's Wordle answer
+		// Rule 16: Must include today's Wordle answer
 		{
-			ID:          15,
+			ID:          16,
 			Description: "Must include today's Wordle answer",
 			Validator:   ValidateWordleAnswer,
 			Hint:        "Include today's Wordle solution: " + GetTodaysAnswerForHint(),
 			Category:    "hard",
 		},
-		// Rule 16: Must include the word in this QR code
+		// Rule 17: Must include the word in this QR code
 		{
-			ID:          16,
+			ID:          17,
 			Description: "Must include the word in this QR code",
 			Validator:   ValidateQRCodeWord,
 			HasCaptcha:  true,
 			Hint:        "Scan the QR code to get the required word.",
 			Category:    "hard",
 		},
-		// Rule 17: Must include a Hex code of the following color
+		// Rule 18: Must include a Hex code of the following color
 		{
-			ID:          17,
+			ID:          18,
 			Description: "Must include a Hex code of the following color",
 			Validator:   ValidateHexColor,
 			Hint: func() string {
@@ -237,9 +245,9 @@ func Pool() []Rule {
 			HasCaptcha: true, // We'll use the captcha display logic to show the color
 			Category:   "hard",
 		},
-		// Rule 18: Must include the best chess move
+		// Rule 19: Must include the best chess move
 		{
-			ID:          18,
+			ID:          19,
 			Description: "Must include the best chess move (image)",
 			Validator:   ValidateChessMove,
 			Hint: func() string {
@@ -252,20 +260,22 @@ func Pool() []Rule {
 			HasCaptcha: true, // Reuse captcha display logic for chess board
 			Category:   "expert",
 		},
-		// Rule 19: Your password is not strong enough 🏋️
-		{
-			ID:          19,
-			Description: "Your password is not strong enough 🏋️",
-			Validator: func(t string) bool {
-				// This rule can never be satisfied - it's a trick rule
-				return false
-			},
-			Hint:     "This rule cannot be satisfied - it's designed to be impossible!",
-			Category: "expert",
-		},
-		// Rule 20: Must contain a palindrome (3+ characters)
+		// Rule 20: Your password is not strong enough 🏋️
 		{
 			ID:          20,
+			Description: "Your password is not strong enough 🏋️",
+			Validator: func(t string) bool {
+				// Satisfy if there are at least 3 🏋️ emojis
+				emoji := "🏋️"
+				count := strings.Count(t, emoji)
+				return count >= 3
+			},
+			Hint:     "Add at least 3 🏋️ emojis to your password.",
+			Category: "expert",
+		},
+		// Rule 21: Must contain a palindrome (3+ characters)
+		{
+			ID:          21,
 			Description: "Must contain a palindrome (3+ characters)",
 			Validator: func(t string) bool {
 				// Check for palindromes of length 3 or more
@@ -282,60 +292,37 @@ func Pool() []Rule {
 			Hint:     "Include a palindrome like 'aba', 'racecar', or '121'.",
 			Category: "expert",
 		},
-		// Rule 21: Must include "pdf file" (placeholder)
-		{
-			ID:          21,
-			Description: "Must include \"pdf file\" (link to malware, when just need the word pdf file)",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "This is a complex interactive rule - placeholder implementation.",
-			Category: "expert",
-		},
-		// Rule 22: Locks password textbox (placeholder)
+		// Rule 22: Must include "pdf file"
 		{
 			ID:          22,
-			Description: "_Locks password textbox_ Oh no! Your password textbox is locked! Watch this raid shadows legend ad to unlock your textbox!",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "This is a complex interactive rule - placeholder implementation.",
-			Category: "expert",
+			Description: "Must include \"pdf file\" (link to malware, when just need the word pdf file)",
+			Validator:   Rule22PDFFile,
+			Hint:        "Include the phrase 'pdf file' in your password.",
+			Category:    "expert",
 		},
-		// Rule 23: Ransomware attack warning (placeholder)
+		// Rule 23: Locks password textbox
 		{
 			ID:          23,
-			Description: "!!Warning!! a ransomware attack is trying to get your password, delete the blackbox to defend it!",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "This is a complex interactive rule - placeholder implementation.",
-			Category: "expert",
+			Description: "_Locks password textbox_ Oh no! Your password textbox is locked! Watch this raid shadows legend ad to unlock your textbox!",
+			Validator:   Rule23PasswordLock,
+			Hint:        "After the ad, include '" + GetRaidUnlockString() + "' in your password.",
+			Category:    "expert",
 		},
-		// Rule 24: Insider threat detection (placeholder)
+		// Rule 24: Ransomware attack warning
 		{
 			ID:          24,
-			Description: "It seems like someone here leaked your information, find the insider threat in your password!",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "This is a complex interactive rule - placeholder implementation.",
-			Category: "expert",
+			Description: "!!Warning!! a ransomware attack is trying to get your password, delete the blackbox to defend it!",
+			Validator:   Rule24RansomwareAttack,
+			Hint:        "Delete the black squares to defend your password!",
+			Category:    "expert",
 		},
-		// Rule 25: Update alert box (placeholder)
+		// Rule 25: Insider threat detection
 		{
 			ID:          25,
-			Description: "A new password rule just got updated! Please click update on the alertbox!",
-			Validator: func(t string) bool {
-				// Placeholder validator - always returns false for now
-				return false
-			},
-			Hint:     "This is a complex interactive rule - placeholder implementation.",
-			Category: "expert",
+			Description: "It seems like someone here leaked your information, find the insider threat in your password!",
+			Validator:   Rule25InsiderThreat,
+			Hint:        "Delete the imposter letters (highlighted in red) from your password! Add 'NOIMPOSTER' to your password when done.",
+			Category:    "expert",
 		},
 	}
 

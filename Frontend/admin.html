@@ -434,6 +434,21 @@
         function allowDrop(ev) {
             ev.preventDefault();
             ev.currentTarget.classList.add('drag-over');
+
+            // Auto-scroll when dragging near the edge of the rules container
+            const container = ev.currentTarget;
+            const rect = container.getBoundingClientRect();
+            const mouseY = ev.clientY;
+            const edgeThreshold = 40; // px
+            const scrollSpeed = 10; // px per event
+
+            if (mouseY - rect.top < edgeThreshold) {
+                // Near top
+                container.scrollTop -= scrollSpeed;
+            } else if (rect.bottom - mouseY < edgeThreshold) {
+                // Near bottom
+                container.scrollTop += scrollSpeed;
+            }
         }
 
         function drag(ev, ruleId) {

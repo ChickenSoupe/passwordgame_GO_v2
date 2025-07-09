@@ -201,6 +201,8 @@ class FLIPAnimator {
                 height: rect.height
             });
         });
+        
+        console.log('Recorded positions for', this.firstStates.size, 'rules');
     }
 
     shouldAnimate() {
@@ -220,18 +222,26 @@ class FLIPAnimator {
 
         const rules = document.querySelectorAll('.rule-item:not(.initially-hidden)');
         const animatingRules = [];
+        
+        console.log('Animating from', this.firstStates.size, 'rules to', rules.length, 'rules');
 
+        // First pass: handle existing rules that moved
         rules.forEach(rule => {
             const ruleId = rule.dataset.ruleId;
             const first = this.firstStates.get(ruleId);
             
-            if (!first) return;
+            // Skip new rules (will be handled in second pass)
+            if (!first) {
+                console.log('New rule appeared:', ruleId);
+                return;
+            }
 
             const last = rule.getBoundingClientRect();
             const deltaX = first.left - last.left;
             const deltaY = first.top - last.top;
 
             if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+                console.log(`Rule ${ruleId} moved: X=${deltaX}, Y=${deltaY}`);
                 rule.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
                 rule.style.transition = 'none';
                 
@@ -240,6 +250,26 @@ class FLIPAnimator {
                 rule.classList.add('flip-animate');
                 rule.style.transition = `transform ${this.animationDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
                 rule.style.transform = 'translate(0, 0)';
+                
+                animatingRules.push(rule);
+            }
+        });
+        
+        // Second pass: handle new rules with a fade-in effect
+        rules.forEach(rule => {
+            const ruleId = rule.dataset.ruleId;
+            if (!this.firstStates.has(ruleId) && rule.classList.contains('newly-revealed')) {
+                console.log('Animating new rule:', ruleId);
+                rule.style.opacity = '0';
+                rule.style.transform = 'translateY(-20px)';
+                rule.style.transition = 'none';
+                
+                rule.offsetHeight; // Force reflow
+                
+                rule.classList.add('flip-animate');
+                rule.style.transition = `opacity ${this.animationDuration}ms ease-out, transform ${this.animationDuration}ms ease-out`;
+                rule.style.opacity = '1';
+                rule.style.transform = 'translateY(0)';
                 
                 animatingRules.push(rule);
             }

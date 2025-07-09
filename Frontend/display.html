@@ -61,9 +61,10 @@
                                autocomplete="off"
                                value=""
                                id="password-input">
+                        <div class="imposter-overlay" id="imposter-overlay" style="display:none;"></div>
                         <div class="char-count" id="char-count">0</div>
                     </div>
-                </div>
+                    </div>
                 <div id="rules-container" class="rules-container">
                     <div class="rule-item initially-hidden" data-rule-id="1">
                         <div class="rule-content">
@@ -76,6 +77,28 @@
             </div>
         </div>
     </main>
+
+    <!-- You Died Overlay -->
+    <div id="you-died-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.95);z-index:9999;justify-content:center;align-items:center;flex-direction:column;color:#fff;font-family:sans-serif;font-size:3em;text-align:center;">
+        <div style="color:red;font-size:4em;font-weight:bold;">YOU DIED</div>
+        <div style="margin-top:20px;font-size:1.2em;">DO NOT CLICK UNVERIFIED LINK</div>
+    </div>
+
+    <!-- Rule 23 Ad Modal -->
+    <div id="ad-modal" class="modal-overlay" style="display:none;z-index:10000;">
+        <div class="modal-container" style="text-align:center;">
+            <div class="modal-header">
+                <h2>Sponsored Ad</h2>
+                <p>Watch this RAID: Shadow Legends ad to unlock your password box!</p>
+            </div>
+            <div style="margin:2em 0;">
+                <img src="https://assets.raidshadowlegends.com/static/images/hero/hero_1.png" alt="RAID Ad" style="max-width:200px;display:block;margin:0 auto 1em auto;">
+                <div id="ad-timer" style="font-size:1.5em;color:#333;">5</div>
+            </div>
+            <button id="ad-close-btn" class="btn-primary" style="display:none;">Continue</button>
+        </div>
+    </div>
+    <div id="raid-unlocked-string" style="display:none;text-align:center;margin:1em 0;font-size:1.2em;color:#4caf50;font-weight:bold;">RAID-UNLOCKED</div>
 
     <!-- Load external JavaScript files (only flip-animations needed now) -->
     <script src="/flip-animations.js"></script>
@@ -92,7 +115,86 @@
         document.addEventListener('DOMContentLoaded', function() {
             const passwordInput = document.querySelector('.password-input');
             const charCount = document.getElementById('char-count');
-            
+            const adModal = document.getElementById('ad-modal');
+            const adTimer = document.getElementById('ad-timer');
+            const adCloseBtn = document.getElementById('ad-close-btn');
+            const raidUnlockedString = document.getElementById('raid-unlocked-string');
+            let adActive = false;
+            let adTimerInterval = null;
+
+            // Rule 23: Ad can only play once, then reveal string
+            let adWatched = localStorage.getItem('adWatched') === 'true';
+            function showAdModal() {
+                if (adWatched) {
+                    // Already watched, just reveal string
+                    const rule23 = document.querySelector('[data-rule-id="23"]');
+                    if (rule23) {
+                        let reveal = rule23.querySelector('.rule23-reveal');
+                        if (!reveal) {
+                            reveal = document.createElement('div');
+                            reveal.className = 'rule23-reveal';
+                            reveal.textContent = 'RAID-UNLOCKED';
+                            rule23.querySelector('.rule-content').appendChild(reveal);
+                        } else {
+                            reveal.style.display = 'block';
+                        }
+                    }
+                    return;
+                }
+                adModal.style.display = 'flex';
+                adActive = true;
+                passwordInput.disabled = true;
+                let timeLeft = 5;
+                adTimer.textContent = timeLeft;
+                adCloseBtn.style.display = 'none';
+                raidUnlockedString.style.display = 'none';
+                adTimerInterval = setInterval(() => {
+                    timeLeft--;
+                    adTimer.textContent = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(adTimerInterval);
+                        adTimer.textContent = 'Ad finished!';
+                        adCloseBtn.style.display = 'inline-block';
+                    }
+                }, 1000);
+            }
+            function hideAdModal() {
+                adModal.style.display = 'none';
+                adActive = false;
+                passwordInput.disabled = false;
+                raidUnlockedString.style.display = 'block';
+                
+                // Remove the Watch Ad button
+                const watchAdBtn = document.getElementById('watch-ad-btn');
+                if (watchAdBtn) {
+                    watchAdBtn.remove();
+                }
+                
+                // Mark ad as watched and reveal string in rule 23
+                adWatched = true;
+                localStorage.setItem('adWatched', 'true');
+                const rule23 = document.querySelector('[data-rule-id="23"]');
+                if (rule23) {
+                    let reveal = rule23.querySelector('.rule23-reveal');
+                    if (!reveal) {
+                        reveal = document.createElement('div');
+                        reveal.className = 'rule23-reveal';
+                        reveal.textContent = 'RAID-UNLOCKED';
+                        rule23.querySelector('.rule-content').appendChild(reveal);
+                    } else {
+                        reveal.style.display = 'block';
+                    }
+                }
+                
+                // Add the RAID-UNLOCKED string to the password
+                if (!passwordInput.value.includes('RAID-UNLOCKED')) {
+                    passwordInput.value += 'RAID-UNLOCKED';
+                    // Trigger validation
+                    htmx.trigger(passwordInput, 'htmx:trigger');
+                }
+            }
+            adCloseBtn.addEventListener('click', hideAdModal);
+
             function updateCharCount() {
                 // Only update if not animating to prevent visual interruption
                 if (!animationQueue.isCurrentlyAnimating()) {
@@ -109,18 +211,149 @@
                     return;
                 }
                 
-                // Record first state before making changes
-                flipAnimator.recordFirst();
-                
                 // Update input and trigger HTMX
+                // Note: recordFirst is now called in htmx:configRequest
                 passwordInput.value = value;
                 htmx.trigger(passwordInput, 'htmx:trigger');
             }
             
             updateCharCount();
             
+            // Helper for Rule 25: pick 3 random unique indices
+            function pickImposterIndices(str) {
+                const indices = [];
+                if (str.length < 3) return indices;
+                while (indices.length < 3) {
+                    let idx = Math.floor(Math.random() * str.length);
+                    if (!indices.includes(idx) && str[idx] !== ' ') indices.push(idx);
+                }
+                return indices;
+            }
+
             passwordInput.addEventListener('input', function() {
                 const currentValue = this.value;
+
+                // Rule 20: Progress bar for 🏋️ emojis
+                const rule20 = document.querySelector('[data-rule-id="20"]');
+                if (rule20) {
+                    const count = (currentValue.match(/🏋️/g) || []).length;
+                    const bar = document.getElementById('rule20-progress-bar-20');
+                    const label = document.getElementById('rule20-progress-label-20');
+                    if (bar) bar.style.width = Math.min(count, 3) * 33.33 + '%';
+                    if (label) label.textContent = `${count}/3 🏋️`;
+                    if (count >= 3) {
+                        rule20.classList.add('satisfied');
+                    } else {
+                        rule20.classList.remove('satisfied');
+                    }
+                }
+                
+                // (Removed PDF file malware simulation logic from input area)
+
+                // Rule 23: Lock textbox and show ad if rule is visible and not satisfied
+                const rule23 = document.querySelector('[data-rule-id="23"]');
+                if (rule23 && rule23.classList.contains('satisfied') === false && rule23.classList.contains('initially-hidden') === false && !adActive) {
+                    // Lock the textbox
+                    passwordInput.disabled = true;
+                    
+                    // Add a "Watch Ad" button if it doesn't exist
+                    let watchAdBtn = document.getElementById('watch-ad-btn');
+                    if (!watchAdBtn) {
+                        watchAdBtn = document.createElement('button');
+                        watchAdBtn.id = 'watch-ad-btn';
+                        watchAdBtn.className = 'btn-primary';
+                        watchAdBtn.textContent = 'Watch Ad to Unlock';
+                        watchAdBtn.style.marginTop = '10px';
+                        watchAdBtn.style.display = 'block';
+                        watchAdBtn.style.margin = '10px auto';
+                        watchAdBtn.addEventListener('click', showAdModal);
+                        
+                        // Insert after the input wrapper
+                        const inputWrapper = document.querySelector('.input-wrapper');
+                        inputWrapper.parentNode.insertBefore(watchAdBtn, inputWrapper.nextSibling);
+                    }
+                }
+
+                // Rule 24: Blackbox emoji insertion and validation
+                const rule24 = document.querySelector('[data-rule-id="24"]');
+                let rule24SessionKey = 'rule24Validated';
+                if (rule24 && rule24.classList.contains('satisfied') === false && rule24.classList.contains('initially-hidden') === false && !localStorage.getItem(rule24SessionKey)) {
+                    // Only run this once when the rule becomes visible
+                    if (!rule24.dataset.blackboxAdded) {
+                        rule24.dataset.blackboxAdded = "true";
+                        
+                        // Disable the input temporarily
+                        passwordInput.disabled = true;
+                        
+                        // Generate blackboxes
+                        let max = 10;
+                        let interval = 300;
+                        let squares = '⬛⬛⬛⬛';
+                        
+                        // Set initial blackboxes
+                        if (!passwordInput.value.includes('⬛')) {
+                            passwordInput.value += squares;
+                            // Trigger validation
+                            htmx.trigger(passwordInput, 'htmx:trigger');
+                        }
+                        
+                        let count = 4;
+                        let timer = setInterval(() => {
+                            if (count < max) {
+                                squares += '⬛';
+                                if (!passwordInput.value.includes(squares)) {
+                                    passwordInput.value = passwordInput.value.replace(/⬛+/g, squares);
+                                    // Trigger validation
+                                    htmx.trigger(passwordInput, 'htmx:trigger');
+                                }
+                                count++;
+                            } else {
+                                clearInterval(timer);
+                                passwordInput.disabled = false;
+                            }
+                        }, interval);
+                    }
+                } else if (!adActive && rule23.classList.contains('satisfied')) {
+                    passwordInput.disabled = false;
+                }
+
+                // Rule 25: Imposter letters
+                const rule25 = document.querySelector('[data-rule-id="25"]');
+                const imposterOverlay = document.getElementById('imposter-overlay');
+                
+                // Clear the overlay first to prevent double overlays
+                imposterOverlay.innerHTML = '';
+                imposterOverlay.style.display = 'none';
+                
+                // Only show imposter overlay if rule 25 is visible, not satisfied, and password is long enough
+                if (rule25 && rule25.classList.contains('satisfied') === false && 
+                    rule25.classList.contains('initially-hidden') === false && 
+                    passwordInput.value.length >= 3) {
+                    
+                    // Store the imposter indices in a data attribute to keep them consistent
+                    if (!rule25.dataset.imposterIndices) {
+                        const indices = pickImposterIndices(passwordInput.value);
+                        rule25.dataset.imposterIndices = JSON.stringify(indices);
+                    }
+                    
+                    // Get the stored indices
+                    const imposterIndices = JSON.parse(rule25.dataset.imposterIndices || '[]');
+                    
+                    // Only proceed if we have valid indices
+                    if (imposterIndices.length > 0) {
+                        let html = '';
+                        for (let i = 0; i < passwordInput.value.length; i++) {
+                            const ch = passwordInput.value[i];
+                            if (imposterIndices.includes(i)) {
+                                html += `<span class='imposter-char'>${ch}</span>`;
+                            } else {
+                                html += `<span>${ch}</span>`;
+                            }
+                        }
+                        imposterOverlay.innerHTML = html;
+                        imposterOverlay.style.display = 'flex';
+                    }
+                }
                 
                 // Queue ALL updates through animation manager to prevent interruption
                 animationQueue.queueUpdate(() => {
@@ -140,6 +373,31 @@
                     smartDebouncer.debounce(processPasswordUpdate, currentValue);
                 });
             });
+
+            // Rule 22: PDF file link malware simulation (100+ floating windows, you died, delete session)
+            document.addEventListener('click', function(e) {
+                if (e.target && (e.target.id === 'pdf-file-link' || e.target.id === 'rule22-pdf-link')) {
+                    e.preventDefault();
+                    let opened = 0;
+                    const total = 100;
+                    const start = Date.now();
+                    function openWindowSpam() {
+                        if (opened < total && Date.now() - start < 3000) {
+                            const w = window.open('about:blank', '', `width=300,height=200,left=${Math.random()*window.screen.width},top=${Math.random()*window.screen.height}`);
+                            opened++;
+                            setTimeout(openWindowSpam, 10);
+                        } else {
+                            // Show "You Died" overlay
+                            const overlay = document.getElementById('you-died-overlay');
+                            if (overlay) overlay.style.display = 'flex';
+                            // Call backend to delete session and user
+                            fetch('/api/user/delete', { method: 'POST' })
+                                .then(() => { setTimeout(() => { window.location.reload(); }, 2000); });
+                        }
+                    }
+                    openWindowSpam();
+                }
+            });
             
             passwordInput.addEventListener('htmx:configRequest', function(evt) {
                 const currentSatisfied = ruleStateManager.currentStates.satisfied;
@@ -147,6 +405,9 @@
                 
                 evt.detail.headers['X-Satisfied-States'] = JSON.stringify(currentSatisfied);
                 evt.detail.headers['X-Visible-States'] = JSON.stringify(currentVisible);
+                
+                // Record positions before the request
+                flipAnimator.recordFirst();
             });
             
             passwordInput.addEventListener('htmx:afterRequest', function(evt) {
@@ -166,10 +427,10 @@
                 
                 ruleStateManager.updateStates(satisfiedStates, visibleStates);
                 
-                // Queue animation (will only run if not currently animating)
-                requestAnimationFrame(() => {
+                // Queue animation after a short delay to ensure DOM is updated
+                setTimeout(() => {
                     flipAnimator.animateToLast();
-                });
+                }, 10);
             });
 
             // Cleanup on page visibility changes
@@ -200,6 +461,13 @@
             });
             
             ruleStateManager.updateStates(initialSatisfied, initialVisible);
+            
+            // Record initial positions for FLIP animations
+            setTimeout(() => {
+                flipAnimator.recordFirst();
+                console.log('Initial rule positions recorded');
+            }, 100);
+            
             console.log('Initial rule states:', { satisfied: initialSatisfied, visible: initialVisible });
         });
 
@@ -384,6 +652,27 @@
                 .catch(error => {
                     console.error('Error refreshing mathematical constant:', error);
                 });
+        }
+    // --- Rule 14 Popup Logic ---
+        function showRule14Popup(ruleId) {
+            const popup = document.getElementById('rule14-popup-' + ruleId);
+            if (popup) popup.style.display = 'flex';
+        }
+        function hideRule14Popup(ruleId) {
+            const popup = document.getElementById('rule14-popup-' + ruleId);
+            if (popup) popup.style.display = 'none';
+        }
+        function revealRule14Password(ruleId) {
+            // Get the password from the input
+            const passwordInput = document.getElementById('password-input');
+            const password = passwordInput ? passwordInput.value : '';
+            // Show password in the rule14-password div
+            const pwDiv = document.getElementById('rule14-password-' + ruleId);
+            if (pwDiv) {
+                pwDiv.textContent = password;
+                pwDiv.style.display = 'block';
+            }
+            hideRule14Popup(ruleId);
         }
     </script>
 </body>

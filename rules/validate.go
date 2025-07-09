@@ -16,8 +16,8 @@ type RuleSet struct {
 
 // Cache for assignments to avoid repeated file reads
 var (
-	assignmentsCache map[string][]int
-	assignmentsMutex sync.RWMutex
+	assignmentsCache  map[string][]int
+	assignmentsMutex  sync.RWMutex
 	assignmentsLoaded bool
 )
 
@@ -25,7 +25,7 @@ var (
 func loadAssignments() map[string][]int {
 	assignmentsMutex.Lock()
 	defer assignmentsMutex.Unlock()
-	
+
 	if assignmentsLoaded {
 		return assignmentsCache
 	}

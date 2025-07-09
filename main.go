@@ -168,6 +168,38 @@ func main() {
 		http.ServeFile(w, r, "Frontend/admin.html")
 	})
 
+	// User delete endpoint for Rule 22
+	http.HandleFunc("/api/user/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		cookie, err := r.Cookie("user_session")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		session, exists := component.UserSessions[cookie.Value]
+		if !exists {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		err = database.DeleteUser(session.UserID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		delete(component.UserSessions, cookie.Value)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Cybersecurity rules routes
+	http.HandleFunc("/api/cysec/status", HandleCyberSecurityStatus)
+	http.HandleFunc("/api/cysec/update-alert", HandleUpdateAlert)
+	http.HandleFunc("/api/cysec/ad-watched", HandleAdWatched)
+	http.HandleFunc("/api/cysec/generate-black-squares", HandleGenerateBlackSquares)
+	http.HandleFunc("/api/cysec/reset", HandleResetCyberSecurity)
+
 	log.Println("🚀 Password Game server starting on :8080")
 	log.Println("🌐 Open http://localhost:8080 in your browser")
 	log.Println("🎮 Password Game: http://localhost:8080/display")
@@ -258,6 +290,103 @@ func RefreshColorHandler(w http.ResponseWriter, r *http.Request) {
 		"status":  "refreshed",
 		"name":    colorName,
 		"hexCode": hexCode,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleCyberSecurityStatus returns the current status of all cybersecurity rules
+func HandleCyberSecurityStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	status := rules.GetCyberSecurityStatus()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
+// HandleUpdateAlert handles the update alert for Rule 14
+func HandleUpdateAlert(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		// Mark update alert as shown
+		rules.SetUpdateAlertShown(true)
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]interface{}{
+			"status":        "shown",
+			"update_string": rules.GetUpdateString(),
+		}
+		json.NewEncoder(w).Encode(response)
+	case http.MethodGet:
+		// Get update alert status
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]interface{}{
+			"shown":         rules.IsUpdateAlertShown(),
+			"update_string": rules.GetUpdateString(),
+		}
+		json.NewEncoder(w).Encode(response)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// HandleAdWatched handles the ad watched status for Rule 23
+func HandleAdWatched(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		// Mark ad as watched
+		rules.SetAdWatched(true)
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]interface{}{
+			"status":             "watched",
+			"raid_unlock_string": rules.GetRaidUnlockString(),
+		}
+		json.NewEncoder(w).Encode(response)
+	case http.MethodGet:
+		// Get ad watched status
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]interface{}{
+			"watched":            rules.IsAdWatched(),
+			"raid_unlock_string": rules.GetRaidUnlockString(),
+		}
+		json.NewEncoder(w).Encode(response)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// HandleGenerateBlackSquares generates black squares for Rule 24
+func HandleGenerateBlackSquares(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	blackSquares := rules.GenerateBlackSquares()
+	count := rules.GetBlackSquareCount()
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"status":      "generated",
+		"squares":     blackSquares,
+		"count":       count,
+		"fatal":       count > 12,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleResetCyberSecurity resets all cybersecurity rule states
+func HandleResetCyberSecurity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	rules.ResetCyberSecurityRules()
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"status": "reset",
 	}
 	json.NewEncoder(w).Encode(response)
 }
