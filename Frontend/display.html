@@ -189,6 +189,8 @@
                 // Add the RAID-UNLOCKED string to the password
                 if (!passwordInput.value.includes('RAID-UNLOCKED')) {
                     passwordInput.value += 'RAID-UNLOCKED';
+                    // Update character count after adding the string
+                    updateCharCount();
                     // Trigger validation
                     htmx.trigger(passwordInput, 'htmx:trigger');
                 }
@@ -196,10 +198,8 @@
             adCloseBtn.addEventListener('click', hideAdModal);
 
             function updateCharCount() {
-                // Only update if not animating to prevent visual interruption
-                if (!animationQueue.isCurrentlyAnimating()) {
-                    charCount.textContent = passwordInput.value.length;
-                }
+                // Always update the character count regardless of animation state
+                charCount.textContent = passwordInput.value.length;
             }
             
             function processPasswordUpdate(value) {
@@ -214,6 +214,8 @@
                 // Update input and trigger HTMX
                 // Note: recordFirst is now called in htmx:configRequest
                 passwordInput.value = value;
+                // Update character count immediately after changing the value
+                updateCharCount();
                 htmx.trigger(passwordInput, 'htmx:trigger');
             }
             
@@ -232,6 +234,9 @@
 
             passwordInput.addEventListener('input', function() {
                 const currentValue = this.value;
+                
+                // Update character count immediately on input
+                updateCharCount();
 
                 // Rule 20: Progress bar for 🏋️ emojis
                 const rule20 = document.querySelector('[data-rule-id="20"]');
@@ -274,7 +279,7 @@
                     }
                 }
 
-                // Rule 24: Blackbox emoji insertion and validation
+                // Rule 24: Blackbox emoji insertion and validation (random position, sample.txt logic)
                 const rule24 = document.querySelector('[data-rule-id="24"]');
                 let rule24SessionKey = 'rule24Validated';
                 if (rule24 && rule24.classList.contains('satisfied') === false && rule24.classList.contains('initially-hidden') === false && !localStorage.getItem(rule24SessionKey)) {
@@ -285,27 +290,38 @@
                         // Disable the input temporarily
                         passwordInput.disabled = true;
                         
-                        // Generate blackboxes
-                        let max = 10;
-                        let interval = 300;
-                        let squares = '⬛⬛⬛⬛';
-                        
-                        // Set initial blackboxes
+                        // Blackbox injection logic (random position between letters)
+                        function isLetter(ch) {
+                            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+                        }
+                        function injectBlackBox(text) {
+                            if (!text || text.length <= 1) return text;
+                            const runes = Array.from(text);
+                            let positions = [];
+                            for (let i = 0; i < runes.length - 1; i++) {
+                                if (isLetter(runes[i]) && isLetter(runes[i+1])) {
+                                    positions.push(i+1);
+                                }
+                            }
+                            if (positions.length === 0) return text + '⬛';
+                            const randomPos = positions[Math.floor(Math.random() * positions.length)];
+                            return runes.slice(0, randomPos).join('') + '⬛' + runes.slice(randomPos).join('');
+                        }
+                        // Only inject if not already present
                         if (!passwordInput.value.includes('⬛')) {
-                            passwordInput.value += squares;
-                            // Trigger validation
+                            passwordInput.value = injectBlackBox(passwordInput.value);
+                            updateCharCount();
                             htmx.trigger(passwordInput, 'htmx:trigger');
                         }
-                        
-                        let count = 4;
+                        // Optionally, repeat a few times for effect (like sample.txt interval)
+                        let count = 1;
+                        let max = 4;
+                        let interval = 300;
                         let timer = setInterval(() => {
                             if (count < max) {
-                                squares += '⬛';
-                                if (!passwordInput.value.includes(squares)) {
-                                    passwordInput.value = passwordInput.value.replace(/⬛+/g, squares);
-                                    // Trigger validation
-                                    htmx.trigger(passwordInput, 'htmx:trigger');
-                                }
+                                passwordInput.value = injectBlackBox(passwordInput.value);
+                                updateCharCount();
+                                htmx.trigger(passwordInput, 'htmx:trigger');
                                 count++;
                             } else {
                                 clearInterval(timer);
@@ -355,11 +371,8 @@
                     }
                 }
                 
-                // Queue ALL updates through animation manager to prevent interruption
+                // Queue rule updates through animation manager to prevent interruption
                 animationQueue.queueUpdate(() => {
-                    // Update character count
-                    updateCharCount();
-                    
                     // Show rule 1 on first input
                     if (!hasUserInput && currentValue.length > 0) {
                         hasUserInput = true;
@@ -486,6 +499,9 @@
                         // Re-validate password after captcha refresh
                         const passwordInput = document.querySelector('.password-input');
                         if (passwordInput && passwordInput.value) {
+                            // Update character count
+                            const charCount = document.getElementById('char-count');
+                            if (charCount) charCount.textContent = passwordInput.value.length;
                             htmx.trigger(passwordInput, 'htmx:trigger');
                         }
                     }
@@ -526,6 +542,9 @@
                         // Re-validate password after chess refresh
                         const passwordInput = document.querySelector('.password-input');
                         if (passwordInput && passwordInput.value) {
+                            // Update character count
+                            const charCount = document.getElementById('char-count');
+                            if (charCount) charCount.textContent = passwordInput.value.length;
                             htmx.trigger(passwordInput, 'input');
                         }
                     }
@@ -570,6 +589,9 @@
                         // Re-validate password after QR code refresh
                         const passwordInput = document.querySelector('.password-input');
                         if (passwordInput && passwordInput.value) {
+                            // Update character count
+                            const charCount = document.getElementById('char-count');
+                            if (charCount) charCount.textContent = passwordInput.value.length;
                             htmx.trigger(passwordInput, 'input');
                         }
                     }

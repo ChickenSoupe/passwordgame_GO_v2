@@ -94,15 +94,10 @@ func ValidatePassword(rs *RuleSet, password string, previousStates []bool, previ
 			oldVisible = previousVisible[i]
 		}
 
-		// Sequential rule visibility logic - Once visible, always visible
-		if rs.Rules[i].ID == 1 || i == 0 {
-			// Always show rule 1 OR the first rule in the set (even when password is empty)
-			rs.Rules[i].IsVisible = true
-		} else if oldVisible {
-			// Keep visible if was previously visible (don't hide once shown)
+		// Once a rule is visible, it stays visible for the session
+		if oldVisible || rs.Rules[i].ID == 1 || i == 0 {
 			rs.Rules[i].IsVisible = true
 		} else if len(password) > 0 && i > 0 {
-			// For rules 2 and above, check if all previous rules are visible
 			allPreviousVisible := true
 			for j := 0; j < i; j++ {
 				if !rs.Rules[j].IsVisible {
@@ -110,8 +105,6 @@ func ValidatePassword(rs *RuleSet, password string, previousStates []bool, previ
 					break
 				}
 			}
-
-			// Show this rule only if all previous rules are visible AND the immediately previous rule is satisfied
 			if allPreviousVisible && rs.Rules[i-1].IsSatisfied {
 				rs.Rules[i].IsVisible = true
 			}

@@ -147,7 +147,7 @@ func InitDB() error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL COLLATE NOCASE,
 		difficulty TEXT NOT NULL CHECK(difficulty IN ('basic', 'intermediate', 'hard', 'expert', 'fun')),
-		rule_reached INTEGER DEFAULT 0 CHECK(rule_reached >= 0 AND rule_reached <= 20),
+		rule_reached INTEGER DEFAULT 0 CHECK(rule_reached >= 0 AND rule_reached <= 50),
 		time_spent INTEGER DEFAULT 0 CHECK(time_spent >= 0),
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -276,8 +276,8 @@ func UpdateUserProgress(userID int64, ruleReached, timeSpent int) error {
 	if userID <= 0 {
 		return fmt.Errorf("invalid user ID: %d", userID)
 	}
-	if ruleReached < 0 || ruleReached > 20 {
-		return fmt.Errorf("invalid rule reached: %d (must be 0-20)", ruleReached)
+	if ruleReached < 0 || ruleReached > 50 {
+		return fmt.Errorf("invalid rule reached: %d (must be 0-50)", ruleReached)
 	}
 	if timeSpent < 0 {
 		return fmt.Errorf("invalid time spent: %d (must be >= 0)", timeSpent)

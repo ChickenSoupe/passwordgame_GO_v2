@@ -9,17 +9,20 @@ import (
 
 // CyberSecurityRules handles all cybersecurity-themed password rules
 type CyberSecurityRules struct {
-	mutex                 sync.RWMutex
-	updateAlertShown      bool
-	updateString          string
-	adWatched             bool
-	raidUnlockString      string
-	blackSquareCount      int
-	blackboxRuleValidated bool
-	imposterIndices       []int
-	imposterOriginalChars []byte
-	imposterRuleValidated bool
-	lastPasswordLength    int
+	mutex                     sync.RWMutex
+	updateAlertShown          bool
+	updateString              string
+	adWatched                 bool
+	raidUnlockString          string
+	blackSquareCount          int
+	blackboxRuleValidated     bool
+	blackboxInjectionStarted  bool
+	blackboxMinimumInjected   bool
+	blackboxLastInjectionTime time.Time
+	imposterIndices           []int
+	imposterOriginalChars     []byte
+	imposterRuleValidated     bool
+	lastPasswordLength        int
 }
 
 var cyberSecRules = &CyberSecurityRules{
@@ -65,11 +68,26 @@ func Rule24RansomwareAttack(password string) bool {
 	blackSquareCount := strings.Count(password, "⬛")
 	cyberSecRules.blackSquareCount = blackSquareCount
 
-	// Rule is satisfied if there are no black squares (user deleted them all)
-	if blackSquareCount == 0 {
-		// Mark the rule as validated for this session
-		cyberSecRules.blackboxRuleValidated = true
-		return true
+	// Start the injection process if not already started
+	if !cyberSecRules.blackboxInjectionStarted {
+		cyberSecRules.blackboxInjectionStarted = true
+		cyberSecRules.blackboxLastInjectionTime = time.Now()
+		return false
+	}
+
+	// Check if we've injected at least 2 black boxes before validating
+	if !cyberSecRules.blackboxMinimumInjected && cyberSecRules.blackSquareCount >= 2 {
+		cyberSecRules.blackboxMinimumInjected = true
+	}
+
+	// Only validate if minimum number of black boxes have been injected
+	if cyberSecRules.blackboxMinimumInjected {
+		// Rule is satisfied if there are no black squares (user deleted them all)
+		if blackSquareCount == 0 {
+			// Mark the rule as validated for this session
+			cyberSecRules.blackboxRuleValidated = true
+			return true
+		}
 	}
 
 	return false
@@ -197,15 +215,43 @@ func GetBlackSquareCount() int {
 	return cyberSecRules.blackSquareCount
 }
 
-// GenerateBlackSquares creates exactly 5 black squares for Rule 24
+// GenerateBlackSquares creates a black square for Rule 24 if enough time has passed
 func GenerateBlackSquares() string {
-	const count = 5 // Always generate exactly 5 black squares
-
 	cyberSecRules.mutex.Lock()
-	cyberSecRules.blackSquareCount = count
-	cyberSecRules.mutex.Unlock()
+	defer cyberSecRules.mutex.Unlock()
 
-	return strings.Repeat("⬛", count)
+	// If rule is already validated, don't inject more black squares
+	if cyberSecRules.blackboxRuleValidated {
+		return ""
+	}
+
+	// Initialize the injection process if not already started
+	if !cyberSecRules.blackboxInjectionStarted {
+		cyberSecRules.blackboxInjectionStarted = true
+		cyberSecRules.blackboxLastInjectionTime = time.Now()
+		cyberSecRules.blackSquareCount = 1
+		return "⬛"
+	}
+
+	// Check if 0.5 seconds have passed since the last injection
+	if time.Since(cyberSecRules.blackboxLastInjectionTime) >= 500*time.Millisecond {
+		// Update the last injection time
+		cyberSecRules.blackboxLastInjectionTime = time.Now()
+
+		// Increment the black square count
+		cyberSecRules.blackSquareCount++
+
+		// If we've injected at least 2 black boxes, mark the minimum as reached
+		if cyberSecRules.blackSquareCount >= 2 && !cyberSecRules.blackboxMinimumInjected {
+			cyberSecRules.blackboxMinimumInjected = true
+		}
+
+		// Inject one black square
+		return "⬛"
+	}
+
+	// Not enough time has passed, don't inject a black square
+	return ""
 }
 
 // GetImposterIndices returns the current imposter indices for Rule 25
@@ -228,6 +274,9 @@ func ResetCyberSecurityRules() {
 	cyberSecRules.adWatched = false
 	cyberSecRules.blackSquareCount = 0
 	cyberSecRules.blackboxRuleValidated = false
+	cyberSecRules.blackboxInjectionStarted = false
+	cyberSecRules.blackboxMinimumInjected = false
+	cyberSecRules.blackboxLastInjectionTime = time.Time{}
 	cyberSecRules.imposterIndices = []int{}
 	cyberSecRules.imposterOriginalChars = []byte{}
 	cyberSecRules.imposterRuleValidated = false
@@ -236,15 +285,18 @@ func ResetCyberSecurityRules() {
 
 // CyberSecurityRuleStatus provides status information for cybersecurity rules
 type CyberSecurityRuleStatus struct {
-	UpdateAlertShown      bool   `json:"update_alert_shown"`
-	UpdateString          string `json:"update_string"`
-	AdWatched             bool   `json:"ad_watched"`
-	RaidUnlockString      string `json:"raid_unlock_string"`
-	BlackSquareCount      int    `json:"black_square_count"`
-	BlackboxRuleValidated bool   `json:"blackbox_rule_validated"`
-	ImposterIndices       []int  `json:"imposter_indices"`
-	ImposterOriginalChars []byte `json:"imposter_original_chars"`
-	ImposterRuleValidated bool   `json:"imposter_rule_validated"`
+	UpdateAlertShown          bool      `json:"update_alert_shown"`
+	UpdateString              string    `json:"update_string"`
+	AdWatched                 bool      `json:"ad_watched"`
+	RaidUnlockString          string    `json:"raid_unlock_string"`
+	BlackSquareCount          int       `json:"black_square_count"`
+	BlackboxRuleValidated     bool      `json:"blackbox_rule_validated"`
+	BlackboxInjectionStarted  bool      `json:"blackbox_injection_started"`
+	BlackboxMinimumInjected   bool      `json:"blackbox_minimum_injected"`
+	BlackboxLastInjectionTime time.Time `json:"blackbox_last_injection_time"`
+	ImposterIndices           []int     `json:"imposter_indices"`
+	ImposterOriginalChars     []byte    `json:"imposter_original_chars"`
+	ImposterRuleValidated     bool      `json:"imposter_rule_validated"`
 }
 
 // GetCyberSecurityStatus returns the current status of all cybersecurity rules
@@ -257,14 +309,17 @@ func GetCyberSecurityStatus() CyberSecurityRuleStatus {
 	copy(originalChars, cyberSecRules.imposterOriginalChars)
 
 	return CyberSecurityRuleStatus{
-		UpdateAlertShown:      cyberSecRules.updateAlertShown,
-		UpdateString:          cyberSecRules.updateString,
-		AdWatched:             cyberSecRules.adWatched,
-		RaidUnlockString:      cyberSecRules.raidUnlockString,
-		BlackSquareCount:      cyberSecRules.blackSquareCount,
-		BlackboxRuleValidated: cyberSecRules.blackboxRuleValidated,
-		ImposterIndices:       append([]int{}, cyberSecRules.imposterIndices...), // Copy slice
-		ImposterOriginalChars: originalChars,
-		ImposterRuleValidated: cyberSecRules.imposterRuleValidated,
+		UpdateAlertShown:          cyberSecRules.updateAlertShown,
+		UpdateString:              cyberSecRules.updateString,
+		AdWatched:                 cyberSecRules.adWatched,
+		RaidUnlockString:          cyberSecRules.raidUnlockString,
+		BlackSquareCount:          cyberSecRules.blackSquareCount,
+		BlackboxRuleValidated:     cyberSecRules.blackboxRuleValidated,
+		BlackboxInjectionStarted:  cyberSecRules.blackboxInjectionStarted,
+		BlackboxMinimumInjected:   cyberSecRules.blackboxMinimumInjected,
+		BlackboxLastInjectionTime: cyberSecRules.blackboxLastInjectionTime,
+		ImposterIndices:           append([]int{}, cyberSecRules.imposterIndices...), // Copy slice
+		ImposterOriginalChars:     originalChars,
+		ImposterRuleValidated:     cyberSecRules.imposterRuleValidated,
 	}
 }

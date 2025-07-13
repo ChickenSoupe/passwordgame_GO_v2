@@ -62,7 +62,8 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
     <div class="rule-content">
         <div class="rule-text">{{.Description}}</div>
         {{if .HasCaptcha}}
-        {{if eq .ID 14}}
+        {{- switch .ID -}}
+        {{- case 14 -}}
         <div class="captcha-container">
             <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
             <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
@@ -79,42 +80,43 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
             </div>
         </div>
         <div id="rule14-password-{{.ID}}" class="rule14-password" style="display:none;"></div>
-        {{else if eq .ID 16}}
+        {{- case 16 -}}
         <div class="qrcode-container">
             <img src="/qrcode.png" alt="QR Code" class="qrcode-image" id="qrcode-{{.ID}}">
             <button type="button" class="refresh-qrcode-btn" onclick="refreshQRCode({{.ID}})">🔄</button>
         </div>
-        {{else if eq .ID 17}}
+        {{- case 17 -}}
         <div class="color-container">
             <img src="/color.png" alt="Color" class="color-image" id="color-{{.ID}}">
             <button type="button" class="refresh-color-btn" onclick="refreshColor({{.ID}})">🔄</button>
         </div>
-        {{else if eq .ID 18}}
+        {{- case 18 -}}
         <div class="chess-container">
             <img src="/chess.png" alt="Chess Board" class="chess-image" id="chess-{{.ID}}">
             <button type="button" class="refresh-chess-btn" onclick="refreshChess({{.ID}})">🔄</button>
         </div>
+        {{- end -}}
         {{end}}
-        {{end}}
-        {{if eq .ID 20}}
+        
+        {{- switch .ID -}}
+        {{- case 20 -}}
         <div class="rule20-progress-container">
             <div class="rule20-progress-bar-bg">
                 <div class="rule20-progress-bar" id="rule20-progress-bar-{{.ID}}" style="width:0%"></div>
             </div>
             <div class="rule20-progress-label" id="rule20-progress-label-{{.ID}}">0/3 🏋️</div>
         </div>
-        {{end}}
-        {{if eq .ID 22}}
+        {{- case 22 -}}
         <div class="rule22-pdf-link">
             <a href="#" id="rule22-pdf-link" style="color:blue;text-decoration:underline;cursor:pointer;">pdf file</a>
         </div>
-        {{end}}
-        {{if eq .ID 23}}
+        {{- case 23 -}}
         <div class="watch-ad-container" id="watch-ad-container-{{.ID}}">
             <button id="watch-ad-btn-23" class="btn-primary" onclick="return showAdModal();">Watch Ad to Unlock</button>
         </div>
         <div class="rule23-reveal" style="display: none;"></div>
-        {{end}}
+        {{- end -}}
+        
         {{if not .IsSatisfied}}
         <div class="rule-hint">{{.Hint}}</div>
         {{end}}
@@ -425,7 +427,6 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	rules.ValidatePassword(ruleSet, password, previousSatisfiedStates, previousVisibleStates)
 
-	// *** CHANGED: Only update database when rules are newly satisfied ***
 	// Track if we need to update the database
 	shouldUpdateDB := false
 	highestNewlySatisfiedRule := 0
