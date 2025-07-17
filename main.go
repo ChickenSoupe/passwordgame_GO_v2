@@ -99,6 +99,9 @@ func main() {
 	// Math constant routes
 	http.HandleFunc("/refresh-constant", RefreshConstantHandler)
 
+	// Toggle hints
+	http.HandleFunc("/api/toggle-hints", HandleToggleHints)
+
 	// Serve static files from Frontend directory
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css")
@@ -190,6 +193,32 @@ func main() {
 			return
 		}
 		delete(component.UserSessions, cookie.Value)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// User session clear endpoint (for "Play Again" functionality)
+	http.HandleFunc("/api/user/clear-session", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		cookie, err := r.Cookie("user_session")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		// Remove session from memory but keep user in database
+		delete(component.UserSessions, cookie.Value)
+
+		// Clear the session cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_session",
+			Value:    "",
+			HttpOnly: true,
+			Path:     "/",
+			MaxAge:   -1, // Expire immediately
+		})
+
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -368,10 +397,10 @@ func HandleGenerateBlackSquares(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]interface{}{
-		"status":      "generated",
-		"squares":     blackSquares,
-		"count":       count,
-		"fatal":       count > 12,
+		"status":  "generated",
+		"squares": blackSquares,
+		"count":   count,
+		"fatal":   count > 12,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -388,6 +417,25 @@ func HandleResetCyberSecurity(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"status": "reset",
 	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleToggleHints toggles the visibility of hints
+func HandleToggleHints(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Toggle the ShowHints setting
+	component.Config.ShowHints = !component.Config.ShowHints
+
+	// Return the new state
+	response := map[string]bool{
+		"showHints": component.Config.ShowHints,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 

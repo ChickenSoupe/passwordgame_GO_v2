@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+const (
+	// updateStringChars defines the characters that can be used in the random update string
+	updateStringChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	// updateStringLength defines the length of the random update string
+	updateStringLength = 8
+)
+
 // CyberSecurityRules handles all cybersecurity-themed password rules
 type CyberSecurityRules struct {
 	mutex                     sync.RWMutex
@@ -26,7 +33,7 @@ type CyberSecurityRules struct {
 }
 
 var cyberSecRules = &CyberSecurityRules{
-	updateString:     "UPDATE-2024",
+	updateString:     "", // Will be generated on first use
 	raidUnlockString: "RAID-UNLOCKED",
 }
 
@@ -34,6 +41,15 @@ var cyberSecRules = &CyberSecurityRules{
 func Rule14UpdateAlert(password string) bool {
 	cyberSecRules.mutex.RLock()
 	defer cyberSecRules.mutex.RUnlock()
+
+	// If no update string has been generated yet, generate one
+	if cyberSecRules.updateString == "" {
+		cyberSecRules.mutex.RUnlock()
+		// Get a new update string (this will generate one if needed)
+		updateStr := GetUpdateString()
+		cyberSecRules.mutex.RLock()
+		return strings.Contains(password, updateStr)
+	}
 
 	// Check if the update string is present in the password
 	return strings.Contains(password, cyberSecRules.updateString)
@@ -166,10 +182,27 @@ func (csr *CyberSecurityRules) generateImposterIndices(password string) {
 	}
 }
 
-// GetUpdateString returns the current update string for Rule 14
+// generateRandomString generates a random string of the specified length using the provided character set
+func generateRandomString(length int, charset string) string {
+	rand.Seed(time.Now().UnixNano())
+	sb := strings.Builder{}
+	sb.Grow(length)
+	for i := 0; i < length; i++ {
+		sb.WriteByte(charset[rand.Intn(len(charset))])
+	}
+	return sb.String()
+}
+
+// GetUpdateString returns the current update string for Rule 14, generating a new one if needed
 func GetUpdateString() string {
-	cyberSecRules.mutex.RLock()
-	defer cyberSecRules.mutex.RUnlock()
+	cyberSecRules.mutex.Lock()
+	defer cyberSecRules.mutex.Unlock()
+	
+	// Generate a new random update string if one doesn't exist
+	if cyberSecRules.updateString == "" {
+		cyberSecRules.updateString = generateRandomString(updateStringLength, updateStringChars)
+	}
+	
 	return cyberSecRules.updateString
 }
 
@@ -270,6 +303,8 @@ func ResetCyberSecurityRules() {
 	cyberSecRules.mutex.Lock()
 	defer cyberSecRules.mutex.Unlock()
 
+	// Generate a new random update string on reset
+	cyberSecRules.updateString = generateRandomString(updateStringLength, updateStringChars)
 	cyberSecRules.updateAlertShown = false
 	cyberSecRules.adWatched = false
 	cyberSecRules.blackSquareCount = 0

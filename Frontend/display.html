@@ -39,6 +39,10 @@
             <span class="menu-icon">🏆</span>
             <span class="menu-text">Leaderboard</span>
         </a>
+        <a href="#" id="toggle-hints" class="hint-toggle">
+            <span class="menu-icon">💡</span>
+            <span class="menu-text">Toggle Hints</span>
+        </a>
     </nav>
     
     <main>
@@ -50,17 +54,16 @@
                 
                 <div class="input-section">
                     <div class="input-wrapper">
-                        <input type="text" 
-                               class="password-input" 
-                               placeholder="insert here..."
-                               hx-post="/validate"
-                               hx-target="#rules-container"
-                               hx-trigger="input"
-                               hx-include="this"
-                               name="password"
-                               autocomplete="off"
-                               value=""
-                               id="password-input">
+                        <textarea class="password-input" 
+                                  placeholder="insert here..."
+                                  hx-post="/validate"
+                                  hx-target="#rules-container"
+                                  hx-trigger="input"
+                                  hx-include="this"
+                                  name="password"
+                                  autocomplete="off"
+                                  id="password-input"
+                                  rows="1"></textarea>
                         <div class="imposter-overlay" id="imposter-overlay" style="display:none;"></div>
                         <div class="char-count" id="char-count">0</div>
                     </div>
@@ -100,10 +103,98 @@
     </div>
     <div id="raid-unlocked-string" style="display:none;text-align:center;margin:1em 0;font-size:1.2em;color:#4caf50;font-weight:bold;">RAID-UNLOCKED</div>
 
+    <!-- Success Modal -->
+    <div id="success-modal" class="modal-overlay" style="display:none;z-index:10001;">
+        <div class="modal-container" style="max-width:600px;text-align:center;">
+            <div class="modal-header">
+                <h1 style="color:#4caf50;font-size:2.5em;margin:0;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">🎉 Congratulations! 🎉</h1>
+                <p style="font-size:1.3em;margin:1em 0;color:#333;">You've successfully completed all password rules!</p>
+            </div>
+            <div style="margin:2em 0;text-align:left;background:#f8f9fa;padding:2em;border-radius:8px;border-left:4px solid #4caf50;">
+                <h2 style="color:#2e7d32;margin-top:0;text-align:center;">🔐 Password Security Tips</h2>
+                <ul style="line-height:1.6;color:#333;margin:1em 0;padding-left:1.5em;">
+                    <li><strong>Use unique passwords</strong> for each account - never reuse passwords across multiple sites</li>
+                    <li><strong>Enable two-factor authentication (2FA)</strong> wherever possible for an extra layer of security</li>
+                    <li><strong>Use a password manager</strong> to generate and store strong, unique passwords securely</li>
+                    <li><strong>Avoid personal information</strong> like birthdays, names, or addresses in your passwords</li>
+                    <li><strong>Keep passwords private</strong> - never share them via email, text, or unsecured channels</li>
+                    <li><strong>Update passwords regularly</strong> especially if you suspect they may have been compromised</li>
+                    <li><strong>Be cautious of phishing</strong> - always verify the authenticity of login pages</li>
+                    <li><strong>Use secure networks</strong> - avoid entering passwords on public Wi-Fi when possible</li>
+                </ul>
+            </div>
+            <div style="margin:2em 0;padding:1.5em;background:#e8f5e8;border-radius:8px;">
+                <h3 style="color:#2e7d32;margin-top:0;">🏆 Achievement Unlocked!</h3>
+                <p style="margin:0.5em 0;color:#333;">You've mastered the art of password creation. Remember, while this game uses extreme rules for fun, real passwords should be:</p>
+                <div style="display:flex;justify-content:space-around;margin:1em 0;flex-wrap:wrap;">
+                    <span style="background:#4caf50;color:white;padding:0.5em 1em;border-radius:20px;margin:0.25em;">Long</span>
+                    <span style="background:#4caf50;color:white;padding:0.5em 1em;border-radius:20px;margin:0.25em;">Random</span>
+                    <span style="background:#4caf50;color:white;padding:0.5em 1em;border-radius:20px;margin:0.25em;">Unique</span>
+                </div>
+            </div>
+            <div style="margin:2em 0;">
+                <button id="success-close-btn" class="btn-primary" style="background:#4caf50;font-size:1.2em;padding:1em 2em;border:none;border-radius:5px;cursor:pointer;">
+                    View Leaderboard
+                </button>
+                <button id="success-restart-btn" class="btn-secondary" style="background:#666;color:white;font-size:1.2em;padding:1em 2em;border:none;border-radius:5px;cursor:pointer;margin-left:1em;">
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Load external JavaScript files (only flip-animations needed now) -->
     <script src="/flip-animations.js"></script>
     
     <script>
+        // Toggle hints functionality
+        document.getElementById('toggle-hints').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Toggle hints via API
+            fetch('/api/toggle-hints', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update the UI to reflect the new state
+                const hintElements = document.querySelectorAll('.rule-hint');
+                hintElements.forEach(hint => {
+                    hint.style.display = data.showHints ? 'block' : 'none';
+                });
+                
+                // Update the button text
+                const toggleBtn = document.getElementById('toggle-hints');
+                const icon = toggleBtn.querySelector('.menu-icon');
+                const text = toggleBtn.querySelector('.menu-text');
+                
+                if (data.showHints) {
+                    icon.textContent = '💡';
+                    text.textContent = 'Hide Hints';
+                } else {
+                    icon.textContent = '🔇';
+                    text.textContent = 'Show Hints';
+                }
+                
+                // Show a brief notification
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = data.showHints ? 'Hints enabled' : 'Hints disabled';
+                document.body.appendChild(notification);
+                
+                // Remove notification after 2 seconds
+                setTimeout(() => {
+                    notification.remove();
+                }, 2000);
+            })
+            .catch(error => {
+                console.error('Error toggling hints:', error);
+            });
+        });
+
         // Initialize components with proper dependencies
         const animationQueue = new window.AnimationSystem.AnimationQueueManager();
         const smartDebouncer = new window.AnimationSystem.SmartDebouncer(250, animationQueue);
@@ -121,6 +212,12 @@
             const raidUnlockedString = document.getElementById('raid-unlocked-string');
             let adActive = false;
             let adTimerInterval = null;
+            
+            // Success modal elements
+            const successModal = document.getElementById('success-modal');
+            const successCloseBtn = document.getElementById('success-close-btn');
+            const successRestartBtn = document.getElementById('success-restart-btn');
+            let gameCompleted = false;
 
             // Rule 23: Ad can only play once, then reveal string
             let adWatched = localStorage.getItem('adWatched') === 'true';
@@ -191,15 +288,113 @@
                     passwordInput.value += 'RAID-UNLOCKED';
                     // Update character count after adding the string
                     updateCharCount();
+                    // Auto-resize textarea after adding content
+                    autoResizeTextarea();
                     // Trigger validation
                     htmx.trigger(passwordInput, 'htmx:trigger');
                 }
             }
             adCloseBtn.addEventListener('click', hideAdModal);
+            
+            // Success modal functions
+            function checkAllRulesSatisfied() {
+                if (gameCompleted) return; // Prevent multiple triggers
+                
+                // Get all visible rules in the current difficulty
+                const visibleRules = document.querySelectorAll('.rule-item:not(.initially-hidden)');
+                const satisfiedRules = document.querySelectorAll('.rule-item:not(.initially-hidden).satisfied');
+                
+                console.log(`Checking rules: ${satisfiedRules.length}/${visibleRules.length} satisfied`);
+                
+                // Check if all visible rules are satisfied
+                if (visibleRules.length > 0 && satisfiedRules.length === visibleRules.length) {
+                    gameCompleted = true;
+                    console.log('All rules satisfied! Showing success modal...');
+                    
+                    // Small delay to ensure any animations finish
+                    setTimeout(() => {
+                        successModal.style.display = 'flex';
+                        // Disable password input
+                        passwordInput.disabled = true;
+                        
+                        // Add celebration effect
+                        successModal.style.animation = 'fadeIn 0.5s ease-in-out';
+                        
+                        // Optional: Send completion event to backend
+                        fetch('/api/game/complete', { 
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                password: passwordInput.value,
+                                completedAt: new Date().toISOString() 
+                            })
+                        }).catch(err => console.log('Failed to log completion:', err));
+                        
+                    }, 500);
+                }
+            }
+            
+            function hideSuccessModal() {
+                successModal.style.display = 'none';
+                gameCompleted = false;
+                passwordInput.disabled = false;
+            }
+            
+            // Success modal event handlers
+            successCloseBtn.addEventListener('click', function() {
+                window.location.href = '/leaderboard';
+            });
+            
+            successRestartBtn.addEventListener('click', function() {
+                // Clear localStorage and session, then reload page for fresh start
+                localStorage.clear();
+                
+                // Call the clear session endpoint
+                fetch('/api/user/clear-session', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Redirect to root which will show the welcome modal
+                        window.location.href = '/';
+                    } else {
+                        console.error('Failed to clear session');
+                        // Fallback: still redirect to home
+                        window.location.href = '/';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error clearing session:', err);
+                    // Fallback: still redirect to home
+                    window.location.href = '/';
+                });
+            });
 
             function updateCharCount() {
                 // Always update the character count regardless of animation state
                 charCount.textContent = passwordInput.value.length;
+            }
+            
+            function autoResizeTextarea() {
+                // Reset height to auto to get the correct scrollHeight
+                passwordInput.style.height = 'auto';
+                
+                // Calculate the new height based on content
+                const scrollHeight = passwordInput.scrollHeight;
+                const minHeight = 56; // Match CSS min-height
+                const maxHeight = 300; // Match CSS max-height
+                
+                // Set the new height within bounds
+                const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+                passwordInput.style.height = newHeight + 'px';
+                
+                // Show scrollbar if content exceeds max height
+                if (scrollHeight > maxHeight) {
+                    passwordInput.style.overflow = 'auto';
+                } else {
+                    passwordInput.style.overflow = 'hidden';
+                }
             }
             
             function processPasswordUpdate(value) {
@@ -216,10 +411,15 @@
                 passwordInput.value = value;
                 // Update character count immediately after changing the value
                 updateCharCount();
+                // Auto-resize textarea after programmatic value change
+                autoResizeTextarea();
                 htmx.trigger(passwordInput, 'htmx:trigger');
             }
             
             updateCharCount();
+            
+            // Initialize textarea size
+            autoResizeTextarea();
             
             // Helper for Rule 25: pick 3 random unique indices
             function pickImposterIndices(str) {
@@ -237,6 +437,9 @@
                 
                 // Update character count immediately on input
                 updateCharCount();
+                
+                // Auto-resize textarea based on content
+                autoResizeTextarea();
 
                 // Rule 20: Progress bar for 🏋️ emojis
                 const rule20 = document.querySelector('[data-rule-id="20"]');
@@ -311,6 +514,7 @@
                         if (!passwordInput.value.includes('⬛')) {
                             passwordInput.value = injectBlackBox(passwordInput.value);
                             updateCharCount();
+                            autoResizeTextarea();
                             htmx.trigger(passwordInput, 'htmx:trigger');
                         }
                         // Optionally, repeat a few times for effect (like sample.txt interval)
@@ -321,6 +525,7 @@
                             if (count < max) {
                                 passwordInput.value = injectBlackBox(passwordInput.value);
                                 updateCharCount();
+                                autoResizeTextarea();
                                 htmx.trigger(passwordInput, 'htmx:trigger');
                                 count++;
                             } else {
@@ -431,11 +636,21 @@
                 let visibleStates = {};
                 
                 if (newSatisfiedStates) {
-                    satisfiedStates = JSON.parse(newSatisfiedStates);
+                    try {
+                        satisfiedStates = JSON.parse(newSatisfiedStates);
+                    } catch (e) {
+                        console.error('Failed to parse X-Satisfied-States header:', e);
+                        satisfiedStates = ruleStateManager.currentStates.satisfied; // Fallback to existing
+                    }
                 }
                 
                 if (newVisibleStates) {
-                    visibleStates = JSON.parse(newVisibleStates);
+                    try {
+                        visibleStates = JSON.parse(newVisibleStates);
+                    } catch (e) {
+                        console.error('Failed to parse X-Visible-States header:', e);
+                        visibleStates = ruleStateManager.currentStates.visible; // Fallback to existing
+                    }
                 }
                 
                 ruleStateManager.updateStates(satisfiedStates, visibleStates);
@@ -443,6 +658,8 @@
                 // Queue animation after a short delay to ensure DOM is updated
                 setTimeout(() => {
                     flipAnimator.animateToLast();
+                    // Check if all rules are satisfied after animations complete
+                    setTimeout(checkAllRulesSatisfied, 1000);
                 }, 10);
             });
 
@@ -513,7 +730,20 @@
 
         // Chess refresh function
         function refreshChess(ruleId) {
-            const refreshBtn = document.querySelector(`button[onclick="refreshChess(${ruleId})"]`);
+            console.log('refreshChess called with ruleId:', ruleId);
+            // Try multiple selectors to find the button
+            let refreshBtn = document.querySelector(`[data-rule-id="${ruleId}"] .refresh-chess-btn`);
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`button[onclick="refreshChess(${ruleId})"]`);
+            }
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`.refresh-chess-btn`);
+            }
+            if (!refreshBtn) {
+                console.error('Chess refresh button not found for rule', ruleId);
+                return;
+            }
+            console.log('Chess refresh button found:', refreshBtn);
             const originalHtml = refreshBtn.innerHTML;
             
             // Show loading state
@@ -545,7 +775,7 @@
                             // Update character count
                             const charCount = document.getElementById('char-count');
                             if (charCount) charCount.textContent = passwordInput.value.length;
-                            htmx.trigger(passwordInput, 'input');
+                            htmx.trigger(passwordInput, 'htmx:trigger');
                         }
                     }
                 })
@@ -569,7 +799,20 @@
 
         // QR Code refresh function
         function refreshQRCode(ruleId) {
-            const refreshBtn = document.querySelector(`button[onclick="refreshQRCode(${ruleId})"]`);
+            console.log('refreshQRCode called with ruleId:', ruleId);
+            // Try multiple selectors to find the button
+            let refreshBtn = document.querySelector(`[data-rule-id="${ruleId}"] .refresh-qrcode-btn`);
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`button[onclick="refreshQRCode(${ruleId})"]`);
+            }
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`.refresh-qrcode-btn`);
+            }
+            if (!refreshBtn) {
+                console.error('QR Code refresh button not found for rule', ruleId);
+                return;
+            }
+            console.log('QR Code refresh button found:', refreshBtn);
             const originalHtml = refreshBtn.innerHTML;
             
             // Show loading state
@@ -592,7 +835,7 @@
                             // Update character count
                             const charCount = document.getElementById('char-count');
                             if (charCount) charCount.textContent = passwordInput.value.length;
-                            htmx.trigger(passwordInput, 'input');
+                            htmx.trigger(passwordInput, 'htmx:trigger');
                         }
                     }
                 })
@@ -616,7 +859,20 @@
 
         // Color refresh function
         function refreshColor(ruleId) {
-            const refreshBtn = document.querySelector(`button[onclick="refreshColor(${ruleId})"]`);
+            console.log('refreshColor called with ruleId:', ruleId);
+            // Try multiple selectors to find the button
+            let refreshBtn = document.querySelector(`[data-rule-id="${ruleId}"] .refresh-color-btn`);
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`button[onclick="refreshColor(${ruleId})"]`);
+            }
+            if (!refreshBtn) {
+                refreshBtn = document.querySelector(`.refresh-color-btn`);
+            }
+            if (!refreshBtn) {
+                console.error('Color refresh button not found for rule', ruleId);
+                return;
+            }
+            console.log('Color refresh button found:', refreshBtn);
             const originalHtml = refreshBtn.innerHTML;
             
             // Show loading state
@@ -636,7 +892,10 @@
                         // Re-validate password after color refresh
                         const passwordInput = document.querySelector('.password-input');
                         if (passwordInput && passwordInput.value) {
-                            htmx.trigger(passwordInput, 'input');
+                            // Update character count
+                            const charCount = document.getElementById('char-count');
+                            if (charCount) charCount.textContent = passwordInput.value.length;
+                            htmx.trigger(passwordInput, 'htmx:trigger');
                         }
                     }
                 })
@@ -695,6 +954,33 @@
                 pwDiv.style.display = 'block';
             }
             hideRule14Popup(ruleId);
+        }
+
+        // Captcha refresh function
+        function refreshCaptcha(ruleId) {
+            fetch('/refresh-captcha', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'refreshed') {
+                        // Add timestamp to force image reload
+                        const captchaImg = document.getElementById('captcha-' + ruleId);
+                        if (captchaImg) {
+                            captchaImg.src = '/captcha.png?' + new Date().getTime();
+                        }
+                        
+                        // Re-validate password after captcha refresh
+                        const passwordInput = document.querySelector('.password-input');
+                        if (passwordInput && passwordInput.value) {
+                            // Update character count
+                            const charCount = document.getElementById('char-count');
+                            if (charCount) charCount.textContent = passwordInput.value.length;
+                            htmx.trigger(passwordInput, 'htmx:trigger');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing captcha:', error);
+                });
         }
     </script>
 </body>

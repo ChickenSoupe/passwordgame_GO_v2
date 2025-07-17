@@ -33,59 +33,169 @@ type QRWord struct {
 	Word string
 }
 
-// FetchRandomWord fetches a random word from the random-word-api.herokuapp.com API
+// FetchRandomWord fetches a random word from multiple APIs with fallback
 func FetchRandomWord() (string, error) {
-	// API endpoint for fetching a random word
-	apiURL := "https://random-word-api.herokuapp.com/word"
+	// Try multiple APIs in order
+	apis := []struct {
+		name   string
+		url    string
+		parser func([]byte) (string, error)
+	}{
+		{
+			name: "random-word-api.herokuapp.com",
+			url:  "https://random-word-api.herokuapp.com/word",
+			parser: func(body []byte) (string, error) {
+				var words []string
+				if err := json.Unmarshal(body, &words); err != nil {
+					return "", fmt.Errorf("failed to parse API response: %v", err)
+				}
+				if len(words) == 0 {
+					return "", fmt.Errorf("API returned empty word list")
+				}
+				return words[0], nil
+			},
+		},
+		{
+			name: "api.wordnik.com",
+			url:  "https://api.wordnik.com/v4/words.json/randomWord?hasDictionaryDef=true&minCorpusCount=0&maxCorpusCount=-1&minDictionaryCount=1&maxDictionaryCount=-1&minLength=3&maxLength=15&api_key=a2a73e7b926c924fad7001ca3111acd55af2ffabf50eb4ae5",
+			parser: func(body []byte) (string, error) {
+				var result struct {
+					Word string `json:"word"`
+				}
+				if err := json.Unmarshal(body, &result); err != nil {
+					return "", fmt.Errorf("failed to parse API response: %v", err)
+				}
+				if result.Word == "" {
+					return "", fmt.Errorf("API returned empty word")
+				}
+				return result.Word, nil
+			},
+		},
+	}
 
+	for _, api := range apis {
+		word, err := fetchRandomWordFromAPI(api.url, api.parser)
+		if err == nil {
+			return word, nil
+		}
+		log.Printf("API %s failed: %v", api.name, err)
+	}
+
+	return "", fmt.Errorf("all APIs failed")
+}
+
+// fetchRandomWordFromAPI attempts to fetch a word from a specific API
+func fetchRandomWordFromAPI(apiURL string, parser func([]byte) (string, error)) (string, error) {
+	return fetchRandomWordWithRetry(apiURL, parser, 2, 2*time.Second)
+}
+
+// fetchRandomWordWithRetry attempts to fetch a random word with exponential backoff
+func fetchRandomWordWithRetry(apiURL string, parser func([]byte) (string, error), maxRetries int, initialDelay time.Duration) (string, error) {
 	// Create a client with a timeout to prevent hanging
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
-	// Make the request
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch random word from API: %v", err)
-	}
-	defer resp.Body.Close()
+	var lastErr error
+	delay := initialDelay
 
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned non-OK status: %d", resp.StatusCode)
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Make the request
+		resp, err := client.Get(apiURL)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to fetch random word from API: %v", err)
+			if attempt < maxRetries-1 {
+				log.Printf("API attempt %d failed, retrying in %v: %v", attempt+1, delay, err)
+				time.Sleep(delay)
+				delay *= 2 // Exponential backoff
+				continue
+			}
+			return "", lastErr
+		}
+		defer resp.Body.Close()
+
+		// Check response status
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("API returned non-OK status: %d", resp.StatusCode)
+			if attempt < maxRetries-1 {
+				log.Printf("API attempt %d failed with status %d, retrying in %v", attempt+1, resp.StatusCode, delay)
+				time.Sleep(delay)
+				delay *= 2
+				continue
+			}
+			return "", lastErr
+		}
+
+		// Read the response body
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read API response: %v", err)
+			if attempt < maxRetries-1 {
+				log.Printf("API attempt %d failed to read response, retrying in %v: %v", attempt+1, delay, err)
+				time.Sleep(delay)
+				delay *= 2
+				continue
+			}
+			return "", lastErr
+		}
+
+		// Parse the JSON response using the provided parser
+		word, err := parser(body)
+		if err != nil {
+			lastErr = err
+			if attempt < maxRetries-1 {
+				log.Printf("API attempt %d failed to parse response, retrying in %v: %v", attempt+1, delay, err)
+				time.Sleep(delay)
+				delay *= 2
+				continue
+			}
+			return "", lastErr
+		}
+
+		// Success! Return the word
+		return word, nil
 	}
 
-	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read API response: %v", err)
-	}
-
-	// Parse the JSON response (the API returns an array of words)
-	var words []string
-	if err := json.Unmarshal(body, &words); err != nil {
-		return "", fmt.Errorf("failed to parse API response: %v", err)
-	}
-
-	// Check if we got any words
-	if len(words) == 0 {
-		return "", fmt.Errorf("API returned empty word list")
-	}
-
-	// Return the first word (the API typically returns just one word)
-	return words[0], nil
+	return "", lastErr
 }
 
 // GetFallbackWords returns a list of fallback words in case the API is unavailable
 func GetFallbackWords() []string {
 	return []string{
+		// Security-related words
 		"password", "security", "encryption", "authentication", "verification",
 		"protection", "firewall", "cybersecurity", "privacy", "confidential",
 		"secret", "hidden", "secure", "private", "locked", "key", "code",
-		"apple", "banana", "orange", "computer", "keyboard", "mouse", "monitor",
+		"token", "access", "login", "session", "certificate", "signature",
+
+		// Technology words
+		"computer", "keyboard", "mouse", "monitor", "server", "database",
+		"network", "internet", "software", "hardware", "system", "program",
+		"website", "browser", "application", "platform", "framework", "library",
+
+		// Nature words
 		"tiger", "lion", "elephant", "dolphin", "eagle", "penguin", "turtle",
-		"happy", "amazing", "awesome", "fantastic", "brilliant", "beautiful",
 		"mountain", "ocean", "beach", "forest", "jungle", "desert", "island",
+		"river", "lake", "tree", "flower", "grass", "cloud", "sunshine",
+
+		// Food words
+		"apple", "banana", "orange", "pizza", "coffee", "bread", "cheese",
+		"chicken", "salmon", "pasta", "rice", "chocolate", "cookie", "cake",
+
+		// Common adjectives
+		"happy", "amazing", "awesome", "fantastic", "brilliant", "beautiful",
+		"wonderful", "incredible", "magnificent", "spectacular", "excellent",
+		"perfect", "outstanding", "remarkable", "extraordinary", "fabulous",
+
+		// Common nouns
+		"house", "car", "book", "phone", "music", "movie", "game", "sport",
+		"travel", "journey", "adventure", "dream", "story", "memory", "friend",
+		"family", "love", "hope", "peace", "joy", "success", "future",
+
+		// Action words
+		"create", "build", "design", "develop", "explore", "discover", "learn",
+		"teach", "share", "connect", "communicate", "innovate", "inspire",
+		"achieve", "accomplish", "complete", "finish", "start", "begin",
 	}
 }
 

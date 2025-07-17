@@ -61,12 +61,9 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
 <div class="rule-item {{if .IsSatisfied}}satisfied{{end}} {{if .NewlyRevealed}}newly-revealed{{end}} {{if .NewlySatisfied}}newly-satisfied{{end}}" data-rule-id="{{.ID}}">
     <div class="rule-content">
         <div class="rule-text">{{.Description}}</div>
-        {{if .HasCaptcha}}
-        {{- switch .ID -}}
-        {{- case 14 -}}
+        
+        {{- if eq .ID 14 -}}
         <div class="captcha-container">
-            <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
-            <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
             <button type="button" class="update-password-btn" onclick="showRule14Popup({{.ID}})">Update</button>
         </div>
         <div id="rule14-popup-{{.ID}}" class="modal-overlay" style="display:none;z-index:10000;">
@@ -80,17 +77,25 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
             </div>
         </div>
         <div id="rule14-password-{{.ID}}" class="rule14-password" style="display:none;"></div>
-        {{- case 16 -}}
+        {{- end -}}
+
+        {{if .HasCaptcha}}
+        {{- if eq .ID 15 -}}
+        <div class="captcha-container">
+            <img src="/captcha.png" alt="Captcha" class="captcha-image" id="captcha-{{.ID}}">
+            <button type="button" class="refresh-captcha-btn" onclick="refreshCaptcha({{.ID}})">🔄</button>
+        </div>
+        {{- else if eq .ID 17 -}}
         <div class="qrcode-container">
             <img src="/qrcode.png" alt="QR Code" class="qrcode-image" id="qrcode-{{.ID}}">
             <button type="button" class="refresh-qrcode-btn" onclick="refreshQRCode({{.ID}})">🔄</button>
         </div>
-        {{- case 17 -}}
+        {{- else if eq .ID 18 -}}
         <div class="color-container">
             <img src="/color.png" alt="Color" class="color-image" id="color-{{.ID}}">
             <button type="button" class="refresh-color-btn" onclick="refreshColor({{.ID}})">🔄</button>
         </div>
-        {{- case 18 -}}
+        {{- else if eq .ID 19 -}}
         <div class="chess-container">
             <img src="/chess.png" alt="Chess Board" class="chess-image" id="chess-{{.ID}}">
             <button type="button" class="refresh-chess-btn" onclick="refreshChess({{.ID}})">🔄</button>
@@ -98,26 +103,25 @@ const rulesPartialTemplate = `{{range $index, $rule := .SortedRules}}
         {{- end -}}
         {{end}}
         
-        {{- switch .ID -}}
-        {{- case 20 -}}
+        {{- if eq .ID 20 -}}
         <div class="rule20-progress-container">
             <div class="rule20-progress-bar-bg">
                 <div class="rule20-progress-bar" id="rule20-progress-bar-{{.ID}}" style="width:0%"></div>
             </div>
             <div class="rule20-progress-label" id="rule20-progress-label-{{.ID}}">0/3 🏋️</div>
         </div>
-        {{- case 22 -}}
+        {{- else if eq .ID 22 -}}
         <div class="rule22-pdf-link">
             <a href="#" id="rule22-pdf-link" style="color:blue;text-decoration:underline;cursor:pointer;">pdf file</a>
         </div>
-        {{- case 23 -}}
+        {{- else if eq .ID 23 -}}
         <div class="watch-ad-container" id="watch-ad-container-{{.ID}}">
             <button id="watch-ad-btn-23" class="btn-primary" onclick="return showAdModal();">Watch Ad to Unlock</button>
         </div>
         <div class="rule23-reveal" style="display: none;"></div>
         {{- end -}}
         
-        {{if not .IsSatisfied}}
+        {{if and (not .IsSatisfied) $.ShowHints}}
         <div class="rule-hint">{{.Hint}}</div>
         {{end}}
     </div>
@@ -137,6 +141,7 @@ type TemplateData struct {
 	Title              string
 	UserSession        *UserSession
 	Difficulties       map[string]DifficultyConfig
+	ShowHints          bool
 }
 
 func analyzeRuleChanges(currentRules []rules.Rule, previousSatisfied, previousVisible []bool) RuleChangeAnalysis {
@@ -351,6 +356,7 @@ func HandlePasswordGame(w http.ResponseWriter, r *http.Request) {
 		AllSatisfied:       false,
 		HasPassword:        false,
 		UserSession:        userSession,
+		ShowHints:          Config.ShowHints,
 	}
 
 	// Execute the display.html template with data
@@ -408,7 +414,7 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal([]byte(states), &stateMap); err == nil {
 			previousSatisfiedStates = make([]bool, len(ruleSet.Rules))
 			for i := 0; i < len(ruleSet.Rules); i++ {
-				previousSatisfiedStates[i] = stateMap[strconv.Itoa(i+1)] // Rule IDs start from 1
+				previousSatisfiedStates[i] = stateMap[strconv.Itoa(ruleSet.Rules[i].ID)] // Use actual rule ID
 			}
 		}
 	}
@@ -420,7 +426,7 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal([]byte(states), &stateMap); err == nil {
 			previousVisibleStates = make([]bool, len(ruleSet.Rules))
 			for i := 0; i < len(ruleSet.Rules); i++ {
-				previousVisibleStates[i] = stateMap[strconv.Itoa(i+1)] // Rule IDs start from 1
+				previousVisibleStates[i] = stateMap[strconv.Itoa(ruleSet.Rules[i].ID)] // Use actual rule ID
 			}
 		}
 	}
@@ -492,6 +498,7 @@ func HandleValidate(w http.ResponseWriter, r *http.Request) {
 		AllSatisfied:       allSatisfied,
 		HasPassword:        len(password) > 0,
 		RuleChanges:        ruleChanges,
+		ShowHints:          Config.ShowHints,
 		UserSession:        userSession,
 	}
 

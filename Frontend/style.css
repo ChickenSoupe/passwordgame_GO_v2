@@ -15,6 +15,50 @@
     padding: 0;
 }
 
+/* Notification */
+.notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 4px;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-out 1.7s;
+    pointer-events: none;
+    font-size: 0.9em;
+}
+
+@keyframes slideIn {
+    from { bottom: -50px; opacity: 0; }
+    to { bottom: 20px; opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Toggle Hints Button */
+#menu a.hint-toggle {
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+#menu a.hint-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#menu a.hint-toggle .menu-icon {
+    transition: transform 0.2s ease;
+}
+
+#menu a.hint-toggle:active .menu-icon {
+    transform: scale(0.9);
+}
+
 /* Pure CSS Sidebar Styles */
 #navcheck {
     position: fixed;
@@ -293,7 +337,7 @@ body {
 
 .input-wrapper {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 15px;
     position: relative;
 }
@@ -343,6 +387,15 @@ body {
     background: white;
     transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    
+    /* Textarea specific styles */
+    resize: none;
+    overflow: hidden;
+    min-height: 56px;
+    max-height: 300px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
 }
 
 .password-input:focus {
@@ -698,6 +751,17 @@ body {
     }
 }
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 .modal-header {
     text-align: center;
     margin-bottom: 2rem;
@@ -795,6 +859,31 @@ body {
 }
 
 .btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: #666;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
+    min-width: 150px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.btn-secondary:hover {
+    background: #555;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 102, 102, 0.4);
+}
+
+.btn-secondary:active {
     transform: translateY(0);
 }
 

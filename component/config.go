@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+// AppConfig holds the application configuration
+type AppConfig struct {
+	// ShowHints controls whether to display rule hints to the user
+	ShowHints bool `json:"showHints"`
+}
+
+// Config holds the global application configuration
+var Config = AppConfig{
+	ShowHints: true, // Default to showing hints
+}
+
 // DifficultyConfig represents the configuration for a difficulty level
 type DifficultyConfig struct {
 	Name        string `json:"name"`
